@@ -129,6 +129,7 @@ CREATE TABLE reviews (
     moderation_status VARCHAR(20) NOT NULL DEFAULT 'approved' CHECK (moderation_status IN ('approved', 'pending', 'hidden', 'rejected')),
     reported_count INTEGER NOT NULL DEFAULT 0,
     like_count INTEGER NOT NULL DEFAULT 0,
+    admin_note TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, product_id)
@@ -209,6 +210,71 @@ CREATE TABLE notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================
+-- Admin Console Tables
+-- ============================================
+
+-- Admins
+CREATE TABLE admins (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    role VARCHAR(30) NOT NULL DEFAULT 'operator' CHECK (role IN ('owner', 'admin', 'operator')),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    last_login_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Admin Logs
+CREATE TABLE admin_logs (
+    id BIGSERIAL PRIMARY KEY,
+    admin_id INTEGER NOT NULL REFERENCES admins(id),
+    action VARCHAR(50) NOT NULL,
+    target_type VARCHAR(30),
+    target_id INTEGER,
+    changes JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Home Sections (편집 홈)
+CREATE TABLE home_sections (
+    id SERIAL PRIMARY KEY,
+    country_id INTEGER NOT NULL REFERENCES countries(id),
+    title VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10),
+    section_type VARCHAR(30) NOT NULL CHECK (section_type IN ('new_this_week', 'trending', 'popular_by_retailer', 'category_trending', 'on_sale', 'categories', 'manual')),
+    is_manual BOOLEAN NOT NULL DEFAULT false,
+    auto_config JSONB,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    display_count INTEGER NOT NULL DEFAULT 10,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    starts_at TIMESTAMPTZ,
+    ends_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Home Section Items (수동 섹션용)
+CREATE TABLE home_section_items (
+    id SERIAL PRIMARY KEY,
+    section_id INTEGER NOT NULL REFERENCES home_sections(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (section_id, product_id)
+);
+
+-- Product Aliases (상품 병합 후 별칭)
+CREATE TABLE product_aliases (
+    id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    alias_name VARCHAR(200) NOT NULL,
+    source VARCHAR(50),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Review Reports
 CREATE TABLE review_reports (
     id SERIAL PRIMARY KEY,
@@ -250,6 +316,13 @@ CREATE INDEX idx_analytics_events_user ON analytics_events(user_id, occurred_at 
 CREATE INDEX idx_analytics_events_session ON analytics_events(session_id, occurred_at);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read, created_at DESC);
 
+-- Admin indexes
+CREATE INDEX idx_admin_logs_admin_time ON admin_logs(admin_id, created_at DESC);
+CREATE INDEX idx_admin_logs_target ON admin_logs(target_type, target_id);
+CREATE INDEX idx_home_sections_country_order ON home_sections(country_id, is_active, display_order);
+CREATE INDEX idx_home_section_items_section ON home_section_items(section_id, display_order);
+CREATE INDEX idx_product_aliases_product ON product_aliases(product_id);
+
 -- ============================================
 -- Seed Data (Korea MVP)
 -- ============================================
@@ -278,3 +351,12 @@ INSERT INTO badge_types (code, name, description) VALUES
 ('early_adopter', '얼리 어답터', '신상품 리뷰를 빠르게 남긴 유저'),
 ('top_reviewer', '탑 리뷰어', '리뷰 10개 이상 작성'),
 ('helpful_reviewer', '도움 되는 리뷰어', '좋아요 50개 이상 획득');
+
+-- 초기 홈 섹션 (편집 홈)
+INSERT INTO home_sections (country_id, title, emoji, section_type, is_manual, auto_config, display_order, display_count) VALUES
+(1, '이번 주 편의점 신상', '🔥', 'new_this_week', false, '{"days": 14, "is_new": true}', 1, 12),
+(1, '지금 핫한 상품', '📈', 'trending', false, '{"window_hours": 24}', 2, 10),
+(1, 'GS25 인기 상품', '🏪', 'popular_by_retailer', false, '{"retailer_slug": "gs25", "sort": "review_count"}', 3, 10),
+(1, 'CU 인기 상품', '🏪', 'popular_by_retailer', false, '{"retailer_slug": "cu", "sort": "review_count"}', 4, 10),
+(1, '카테고리', '🎯', 'categories', false, NULL, 5, 6),
+(1, '지금 할인 중', '💰', 'on_sale', false, '{"min_discount_percent": 10}', 6, 10);

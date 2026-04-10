@@ -77,6 +77,22 @@ export enum NotificationType {
   REVIEW_REPLY = 'review_reply',
 }
 
+export enum AdminRole {
+  OWNER = 'owner',
+  ADMIN = 'admin',
+  OPERATOR = 'operator',
+}
+
+export enum HomeSectionDbType {
+  NEW_THIS_WEEK = 'new_this_week',
+  TRENDING = 'trending',
+  POPULAR_BY_RETAILER = 'popular_by_retailer',
+  CATEGORY_TRENDING = 'category_trending',
+  ON_SALE = 'on_sale',
+  CATEGORIES = 'categories',
+  MANUAL = 'manual',
+}
+
 export enum AnalyticsEventType {
   PRODUCT_VIEWED = 'product_viewed',
   REVIEW_COMPOSE_STARTED = 'review_compose_started',
@@ -321,6 +337,81 @@ export interface AnalyticsEvent {
   eventType: AnalyticsEventType;
   properties: Record<string, unknown>;
   occurredAt: string;
+}
+
+// --- Admin Console Domain Types ---
+
+export interface Admin {
+  id: number;
+  email: string;
+  name: string;
+  role: AdminRole;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminLog {
+  id: number;
+  adminId: number;
+  action: string;
+  targetType: string | null;
+  targetId: number | null;
+  changes: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface HomeSectionConfig {
+  id: number;
+  countryId: number;
+  title: string;
+  emoji: string | null;
+  sectionType: HomeSectionDbType;
+  isManual: boolean;
+  autoConfig: Record<string, unknown> | null;
+  displayOrder: number;
+  displayCount: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+export interface HomeSectionItem {
+  id: number;
+  sectionId: number;
+  productId: number;
+  displayOrder: number;
+}
+
+export interface ProductAlias {
+  id: number;
+  productId: number;
+  aliasName: string;
+  source: string | null;
+  createdAt: string;
+}
+
+export interface DashboardStats {
+  totalProducts: number;
+  totalReviews: number;
+  newReviewsToday: number;
+  pendingReports: number;
+}
+
+export interface DashboardActionItems {
+  newProductsWithoutReviews: number;
+  productsWithoutRetailer: number;
+  reviewsNeedingModeration: number;
+  comingSoonRetailersWithoutProducts: number;
+}
+
+export interface MergeCandidate {
+  productA: Pick<Product, 'id' | 'name' | 'brandId' | 'reviewCount'>;
+  productB: Pick<Product, 'id' | 'name' | 'brandId' | 'reviewCount'>;
+  brandMatch: boolean;
+  barcodeSimilarity: number;
+  nameSimilarity: number;
+  volumeSimilarity: number;
 }
 
 // --- Home Section Types ---

@@ -179,10 +179,13 @@ MVP에서는 텍스트 리뷰만이지만, 테이블 설계 시 확장을 고려
 | `badge_types` | 뱃지 종류 정의 | **Must (GTM)** |
 | `analytics_events` | 리뷰 작성 깔때기 트래킹용 이벤트 로그 | **Must (GTM)** |
 | `notifications` | 좋아요 받음 등 알림 | Should Have |
+| `home_sections` | 홈 섹션 정의 (편집 홈) | **Must (Admin)** |
+| `home_section_items` | 수동 섹션의 상품 연결 | **Must (Admin)** |
+| `product_aliases` | 상품 병합 후 별칭 관리 | **Must (Admin)** |
+| `admins` | 관리자 계정 | **Must (Admin)** |
+| `admin_logs` | 관리자 작업 로그 | **Must (Admin)** |
 | `product_images` | 상품 이미지 (복수) | Post-MVP |
-| `product_aliases` | 상품 이명 관리 (동일 상품 매칭) | Post-MVP |
 | `price_histories` | 가격 변동 기록 | Post-MVP |
-| `admin_logs` | 관리자 작업 로그 | Should Have |
 
 #### 6. GTM 관련 테이블 상세
 
@@ -843,31 +846,63 @@ Response:
 
 ---
 
-## F. 관리자 페이지 초안
+## F. 관리자 콘솔
 
-### MVP 관리자 기능
+> 📌 상세 설계: [ADMIN_CONSOLE.md](./ADMIN_CONSOLE.md)
+>
+> 관리자 페이지는 **운영 콘솔**이다. 예쁠 필요 없고 빠르고 명확해야 한다. 운영자가 매일 해야 하는 4가지 일(상품 등록/수정, 리테일러 연결, 리뷰 관리, 홈 운영)이 바로 보여야 한다.
 
-| 기능 그룹 | 화면 | 설명 |
-|-----------|------|------|
-| **상품 관리** | 상품 목록 | 검색, 필터(카테고리/브랜드/상태), 페이징 |
-| | 상품 등록/수정 | 이름, 브랜드, 카테고리, 이미지, 바코드, 용량 입력 |
-| | 상품 상태 관리 | active / inactive / draft |
-| **브랜드 관리** | 브랜드 CRUD | 이름, 로고 |
-| **카테고리 관리** | 카테고리 CRUD | 이름, 순서, 부모 카테고리 |
-| **리테일러 관리** | 리테일러 CRUD | 이름, 로고, launch_status |
-| | RetailerProduct 연결 | 특정 리테일러에 상품 연결, 가격 입력 |
-| **리뷰 관리** | 신고 리뷰 목록 | 신고된 리뷰 확인, 숨김/해제/무시 처리 |
-| | 리뷰 검색 | 유저/상품/리테일러별 리뷰 검색 |
+### 관리자 4대 핵심 활동
 
-### Post-MVP 관리자 기능
+| 활동 | 화면 | 빈도 |
+|------|------|------|
+| 신상품을 빨리 넣는다 | 상품 등록 → 리테일러 연결 | 매일 |
+| 중복 상품을 정리한다 | 상품 병합 | 주간 |
+| 이상 리뷰를 처리한다 | 리뷰 관리 | 매일 |
+| 홈을 살아있게 유지한다 | 홈 운영 | 주간 |
 
-| 기능 | 설명 |
+### 1차 MVP 필수 화면
+
+| # | 화면 | 목적 |
+|---|------|------|
+| 1 | 로그인 | 보안 |
+| 2 | 대시보드 (단순) | "운영 필요 항목" 중심 |
+| 3 | 상품 목록 | 검색/필터/상태 관리 |
+| 4 | 상품 등록/수정 | 브랜드·카테고리 자동완성 필수 |
+| 5 | 리테일러 상품 관리 | 상품↔리테일러 연결, 가격 관리 |
+| 6 | 리뷰 관리 | 목록/필터/숨김/신고 처리 |
+| 7 | 홈 운영 | 섹션별 활성/순서/조건 관리 |
+| 8 | 상품 병합 (수동) | 동일 상품 통합, 리뷰 이관 |
+
+### 2차 (런칭 후)
+
+- 브랜드 관리, 카테고리 관리, 리테일러 관리 (초기엔 시드로 충분)
+- 신고 처리 전용 화면
+
+### 3차 (나중)
+
+- 병합 후보 자동 추천 (유사도 기반)
+- 대시보드 고도화 (통계 그래프)
+- 벌크 업로드 (CSV)
+- 관리자 권한/역할 분리
+
+### 🚨 운영 필요 항목 (대시보드 핵심 블록)
+
+대시보드는 숫자를 보는 곳이 아니라 **할 일을 보는 곳**이다:
+
+- 리뷰 없는 신상품 (등록 후 3일+ 지났는데 리뷰 0개)
+- 리테일러 미연결 상품
+- 숨김 검토 필요 리뷰 (신고 누적)
+- coming_soon 상태인데 상품 0개인 리테일러
+
+### ⚠️ 치명적 UX 요건
+
+| 요건 | 이유 |
 |------|------|
-| 상품 병합 | 동일 상품 판별 후 병합 (리뷰 통합) |
-| 상품 매칭 후보 | 이름/바코드 유사도 기반 매칭 후보 추천 |
-| 대시보드 | 일간 리뷰 수, 신규 유저, 인기 상품 등 |
-| 유저 관리 | 차단, 경고, 활동 이력 |
-| 벌크 업로드 | CSV로 상품/가격 일괄 등록 |
+| **브랜드·카테고리 자동완성 필수** | 매번 새 입력 → 데이터 오염 |
+| **리테일러 상품 폼의 상품 검색 자동완성 필수** | 없으면 신상품 추가 포기 |
+| **"저장 후 리테일러 연결하기" 버튼** | 가장 빈번한 운영 동선 |
+| **데스크톱 전용 (모바일 대응 X)** | 테이블 중심 운영, 모바일 불필요 |
 
 ### 관리자 API
 
@@ -875,23 +910,31 @@ Response:
 # 인증
 POST   /api/admin/v1/auth/login
 
+# 대시보드
+GET    /api/admin/v1/dashboard/stats
+GET    /api/admin/v1/dashboard/action-items
+
 # 상품
 GET    /api/admin/v1/products
 POST   /api/admin/v1/products
 PUT    /api/admin/v1/products/:id
 DELETE /api/admin/v1/products/:id
+GET    /api/admin/v1/products/autocomplete?q=...
+GET    /api/admin/v1/products/merge-candidates
+POST   /api/admin/v1/products/:id/merge
+       body: { "target_product_id": 456, "create_alias": true }
 
-# 브랜드
+# 브랜드 / 카테고리 / 리테일러
 GET    /api/admin/v1/brands
 POST   /api/admin/v1/brands
 PUT    /api/admin/v1/brands/:id
+GET    /api/admin/v1/brands/autocomplete?q=...
 
-# 카테고리
 GET    /api/admin/v1/categories
 POST   /api/admin/v1/categories
 PUT    /api/admin/v1/categories/:id
+GET    /api/admin/v1/categories/autocomplete?q=...
 
-# 리테일러
 GET    /api/admin/v1/retailers
 PUT    /api/admin/v1/retailers/:id
 
@@ -904,12 +947,29 @@ DELETE /api/admin/v1/retailer-products/:id
 # 리뷰 관리
 GET    /api/admin/v1/reviews?moderation_status=reported
 PUT    /api/admin/v1/reviews/:id/moderate
-       body: { "action": "hide" | "approve" | "dismiss" }
+       body: { "action": "hide" | "approve" | "dismiss", "admin_note": "..." }
 
 # 리뷰 신고
 GET    /api/admin/v1/review-reports?status=pending
 PUT    /api/admin/v1/review-reports/:id
        body: { "status": "resolved" | "dismissed" }
+
+# 홈 운영
+GET    /api/admin/v1/home-sections
+POST   /api/admin/v1/home-sections
+PUT    /api/admin/v1/home-sections/:id
+DELETE /api/admin/v1/home-sections/:id
+PUT    /api/admin/v1/home-sections/reorder
+       body: { "ids": [3, 1, 2, 4] }
+
+# 수동 섹션 상품 관리
+GET    /api/admin/v1/home-sections/:id/items
+POST   /api/admin/v1/home-sections/:id/items
+DELETE /api/admin/v1/home-sections/:id/items/:itemId
+PUT    /api/admin/v1/home-sections/:id/items/reorder
+
+# 운영 로그
+GET    /api/admin/v1/logs?admin_id=1&target_type=review
 ```
 
 ---

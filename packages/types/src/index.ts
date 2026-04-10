@@ -182,6 +182,19 @@ export interface User {
   updatedAt: string;
 }
 
+export enum ReviewTagCode {
+  TASTE_GOOD = 'taste_good',
+  TASTE_BAD = 'taste_bad',
+  TASTE_SWEET = 'taste_sweet',
+  TASTE_SPICY = 'taste_spicy',
+  VALUE_GOOD = 'value_good',
+  VALUE_BAD = 'value_bad',
+  AMOUNT_LARGE = 'amount_large',
+  AMOUNT_SMALL = 'amount_small',
+  REPURCHASE_YES = 'repurchase_yes',
+  CONTROVERSIAL = 'controversial',
+}
+
 export interface Review {
   id: number;
   userId: number;
@@ -190,15 +203,29 @@ export interface Review {
   rating: number;
   title: string | null;
   body: string;
-  tasteScore: number;
-  valueScore: number;
-  amountScore: number;
+  tags: ReviewTagCode[];
   repurchaseIntent: boolean;
   moderationStatus: ModerationStatus;
   reportedCount: number;
   likeCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateReviewRequest {
+  retailerId?: number | null;
+  rating: number;
+  body?: string;
+  tags?: ReviewTagCode[];
+}
+
+export interface CreateReviewResponse {
+  review: Pick<Review, 'id' | 'rating' | 'body' | 'tags' | 'repurchaseIntent' | 'createdAt'>;
+  awardedBadges: Array<{
+    code: BadgeCode;
+    name: string;
+    iconUrl: string | null;
+  }>;
 }
 
 // --- API Response Types ---
@@ -242,7 +269,9 @@ export interface ProductDetailResponse {
 export interface ReviewListResponse {
   reviews: Array<
     Review & {
-      user: Pick<User, 'id' | 'nickname' | 'profileImageUrl'>;
+      user: Pick<User, 'id' | 'nickname' | 'profileImageUrl'> & {
+        badges: BadgeCode[];
+      };
       retailer: Pick<Retailer, 'id' | 'name'> | null;
       isLikedByMe: boolean;
     }

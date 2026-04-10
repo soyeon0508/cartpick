@@ -81,8 +81,13 @@
 | **상품 상세: 구매처별 리뷰 필터** | 리테일러 카드 탭 → 해당 구매처 리뷰만 보기 | - |
 | **상품 상세: 케이스별 리뷰 전환 UI** | 리뷰 0개 / 1~3개 / 4+개 각각 다른 유도 UI | Activation |
 | 통합 리뷰 목록 | 상품 기준 리뷰 통합, 리테일러별 필터 | - |
-| 리뷰 작성/수정 | 한 상품당 1리뷰, 수정 가능. 별점 + 서브점수 + 텍스트 | - |
-| **경량 리뷰 작성 폼** | 별점 + 태그 체크박스 + (선택) 한 줄평. 3초 내 작성 가능 | Activation |
+| 리뷰 작성/수정 | 한 상품당 1리뷰, 수정 가능 | - |
+| **단일 화면 리뷰 작성 폼** | 별점 → 태그 → 구매처 → 한줄평 순서, 한 화면에서 완료 | Activation |
+| **별점 자동 확장 UX** | 별점 선택 시 태그 영역 슬라이드 자동 노출 | Activation |
+| **별점별 감정 메시지** | "무난했나요?", "정말 맛있었나요?" 등 동적 메시지 | Activation |
+| **리뷰 작성 후 로그인** | 폼 작성 완료 → 제출 시점에 로그인 (작성 전 로그인 강제 금지) | Activation |
+| **리뷰 제출 완료 보상 화면** | 🎉 완료 메시지 + 뱃지 획득 애니메이션 | Activation |
+| **플레이스홀더 예시 텍스트** | 한 줄평 입력창에 예시 문장 (빈칸 공포 제거) | Activation |
 | **첫 리뷰 유도 UX** | 리뷰 0개 상품에 "첫 리뷰어가 되어보세요" 배너 + 뱃지 유도 | Activation |
 | **첫 리뷰어 뱃지** | 상품의 첫 리뷰 작성자에게 "First Reviewer" 뱃지 지급 | Activation |
 | **검색 → 리뷰 작성 경로 최적화** | 검색 → 상품 상세 → 리뷰 작성까지 3탭 이내 | KPI 3 |
@@ -141,6 +146,13 @@
 UNIQUE (user_id, product_id)
 ```
 
+**⚠️ 중요 변경 (리뷰 작성 UX 반영):**
+- `taste_score`, `value_score`, `amount_score` 필드 **제거**
+- 이유: 리뷰 작성 UX가 태그 기반 경량 폼으로 변경되어 다중 점수 필드는 이탈률을 높임
+- 대체: 신규 `review_tags` 테이블로 맛/가성비/양 관련 태그 수집
+- `body` 필드는 `NOT NULL DEFAULT ''`로 변경 (한 줄평이 선택 사항이므로)
+- 상세: [REVIEW_COMPOSE_UX.md](./REVIEW_COMPOSE_UX.md)
+
 #### 2. `products` 테이블 - `review_count`, `average_rating` 관리 전략
 
 비정규화 필드로 성능상 맞지만, 갱신 전략이 필요:
@@ -159,6 +171,7 @@ MVP에서는 텍스트 리뷰만이지만, 테이블 설계 시 확장을 고려
 
 | 테이블 | 용도 | MVP 필요 여부 |
 |--------|------|---------------|
+| `review_tags` | 리뷰 태그 (맛있어요, 가성비 좋아요 등) | **Must (UX)** |
 | `review_likes` | 리뷰 좋아요 | Should Have |
 | `bookmarks` | 상품 즐겨찾기 | Should Have |
 | `review_reports` | 리뷰 신고 | Should Have |
@@ -321,11 +334,8 @@ VARCHAR(200), nullable
 │ product_id (FK)              │
 │ retailer_id (FK, nullable)   │
 │ rating (1-5)                 │
-│ title                        │
-│ body                         │
-│ taste_score (1-5)            │
-│ value_score (1-5)            │
-│ amount_score (1-5)           │
+│ title (nullable)             │
+│ body (default '')            │
 │ repurchase_intent (boolean)  │
 │ moderation_status            │
 │ reported_count               │
@@ -334,6 +344,19 @@ VARCHAR(200), nullable
 │ updated_at                   │
 │                              │
 │ UNIQUE(user_id, product_id)  │
+└──────┬───────────────────────┘
+       │
+       │ 1:N
+       │
+┌──────▼───────────────────────┐
+│       review_tags            │
+│─────────────────────────────│
+│ id (PK)                      │
+│ review_id (FK CASCADE)       │
+│ tag_code (varchar)           │
+│ created_at                   │
+│                              │
+│ UNIQUE(review_id, tag_code)  │
 └──────────────────────────────┘
 
 ┌──────────────────────────────┐
@@ -599,12 +622,36 @@ Request (리뷰 작성):
 {
   "retailer_id": 1,
   "rating": 4,
-  "title": "맛있는데 양이 적어요",
-  "body": "젤리 질감이 좋고 과일맛이 진한데, 100g이라 금방 먹어요...",
-  "taste_score": 5,
-  "value_score": 3,
-  "amount_score": 3,
-  "repurchase_intent": true
+  "body": "생각보다 맛있는데 조금 달아요",
+  "tags": ["taste_good", "taste_sweet", "value_good", "repurchase_yes"]
+}
+```
+
+필드 규칙:
+- `rating`: **필수** (1~5)
+- `body`: 선택 (빈 문자열 허용, 최대 2000자)
+- `tags`: 선택 (허용된 `tag_code` 배열)
+- `retailer_id`: 선택 (nullable)
+- `repurchase_intent`: 서버에서 `tags`에 `repurchase_yes` 포함 여부로 자동 결정
+
+Response (리뷰 작성 성공):
+```json
+{
+  "review": {
+    "id": 501,
+    "rating": 4,
+    "body": "생각보다 맛있는데 조금 달아요",
+    "tags": ["taste_good", "taste_sweet", "value_good", "repurchase_yes"],
+    "repurchase_intent": true,
+    "created_at": "2026-04-10T10:30:00Z"
+  },
+  "awarded_badges": [
+    {
+      "code": "first_reviewer",
+      "name": "첫 리뷰어",
+      "icon_url": "..."
+    }
+  ]
 }
 ```
 
@@ -617,18 +664,16 @@ Response (리뷰 목록):
       "user": {
         "id": 10,
         "nickname": "젤리러버",
-        "profile_image_url": "..."
+        "profile_image_url": "...",
+        "badges": ["first_reviewer"]
       },
       "retailer": {
         "id": 1,
         "name": "GS25"
       },
       "rating": 4,
-      "title": "맛있는데 양이 적어요",
-      "body": "...",
-      "taste_score": 5,
-      "value_score": 3,
-      "amount_score": 3,
+      "body": "생각보다 맛있는데 조금 달아요",
+      "tags": ["taste_good", "value_good", "repurchase_yes"],
       "repurchase_intent": true,
       "like_count": 12,
       "is_liked_by_me": false,
@@ -646,6 +691,10 @@ Response (리뷰 목록):
   }
 }
 ```
+
+> 📌 리뷰 작성 UX 상세 설계: [REVIEW_COMPOSE_UX.md](./REVIEW_COMPOSE_UX.md)
+>
+> 단일 화면 플로우, 별점→태그→구매처→텍스트 순서, 전환율 트릭, 로그인 타이밍, 케이스별 CTA 상세 정의.
 
 ### 리뷰 좋아요
 

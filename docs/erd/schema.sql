@@ -124,17 +124,23 @@ CREATE TABLE reviews (
     retailer_id INTEGER REFERENCES retailers(id),
     rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     title VARCHAR(100),
-    body TEXT NOT NULL,
-    taste_score SMALLINT NOT NULL CHECK (taste_score BETWEEN 1 AND 5),
-    value_score SMALLINT NOT NULL CHECK (value_score BETWEEN 1 AND 5),
-    amount_score SMALLINT NOT NULL CHECK (amount_score BETWEEN 1 AND 5),
-    repurchase_intent BOOLEAN NOT NULL,
+    body VARCHAR(2000) NOT NULL DEFAULT '',
+    repurchase_intent BOOLEAN NOT NULL DEFAULT false,
     moderation_status VARCHAR(20) NOT NULL DEFAULT 'approved' CHECK (moderation_status IN ('approved', 'pending', 'hidden', 'rejected')),
     reported_count INTEGER NOT NULL DEFAULT 0,
     like_count INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, product_id)
+);
+
+-- Review Tags (경량 리뷰 태그 — 맛있어요, 가성비 좋아요 등)
+CREATE TABLE review_tags (
+    id SERIAL PRIMARY KEY,
+    review_id INTEGER NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    tag_code VARCHAR(30) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (review_id, tag_code)
 );
 
 -- Review Likes
@@ -232,6 +238,8 @@ CREATE INDEX idx_retailer_products_product ON retailer_products(product_id);
 CREATE INDEX idx_reviews_product ON reviews(product_id, moderation_status, created_at DESC);
 CREATE INDEX idx_reviews_product_retailer ON reviews(product_id, retailer_id);
 CREATE INDEX idx_reviews_user ON reviews(user_id, created_at DESC);
+CREATE INDEX idx_review_tags_tag ON review_tags(tag_code);
+CREATE INDEX idx_review_tags_review ON review_tags(review_id);
 CREATE INDEX idx_bookmarks_user ON bookmarks(user_id, created_at DESC);
 CREATE INDEX idx_review_reports_status ON review_reports(status, created_at DESC);
 

@@ -74,6 +74,12 @@
 | 카테고리 탐색 | 과자, 젤리, 음료, 라면, 아이스크림, 간편식 | - |
 | 리테일러별 상품 목록 | 리테일러 진입 → 카테고리별 상품 리스트 | - |
 | 상품 상세 | 이름, 브랜드, 이미지, 판매 리테일러 목록, 가격 참고 | - |
+| **상품 상세: 한 줄 요약** | 상품 헤더 하단 `summary_line` 노출 (관리자 입력) | Conversion |
+| **상품 상세: 상단 CTA** | 헤더 바로 아래 "리뷰 쓰기" 버튼 (즉시 작성 진입) | Conversion |
+| **상품 상세: 하단 고정 CTA** | 스크롤 무관 항상 노출되는 Sticky 리뷰 작성 버튼 | Conversion |
+| **상품 상세: 리뷰 요약 키워드** | 태그 집계 기반 "많이 언급된 키워드" 섹션 | Conversion |
+| **상품 상세: 구매처별 리뷰 필터** | 리테일러 카드 탭 → 해당 구매처 리뷰만 보기 | - |
+| **상품 상세: 케이스별 리뷰 전환 UI** | 리뷰 0개 / 1~3개 / 4+개 각각 다른 유도 UI | Activation |
 | 통합 리뷰 목록 | 상품 기준 리뷰 통합, 리테일러별 필터 | - |
 | 리뷰 작성/수정 | 한 상품당 1리뷰, 수정 가능. 별점 + 서브점수 + 텍스트 | - |
 | **경량 리뷰 작성 폼** | 별점 + 태그 체크박스 + (선택) 한 줄평. 3초 내 작성 가능 | Activation |
@@ -199,6 +205,17 @@ event_type 예:
 ```
 id, user_id, type ('review_liked', 'new_product' 등),
 title, body, data (jsonb), is_read, created_at
+```
+
+#### 7. 상품 상세 UX 관련 필드
+
+상품 상세 페이지의 한 줄 요약을 위한 컬럼:
+
+**`products.summary_line`** (MVP 필수)
+```
+VARCHAR(200), nullable
+- MVP: 관리자 수동 입력
+- Post-MVP: 리뷰 기반 자동 생성 (AI 요약 또는 top review title)
 ```
 
 ### 최종 ERD
@@ -499,6 +516,7 @@ Response (상품 상세):
   "product": {
     "id": 101,
     "name": "하리보 골드베렌 100g",
+    "summary_line": "달긴 한데 계속 손이 가는 젤리",
     "brand": {
       "id": 5,
       "name": "하리보",
@@ -522,7 +540,16 @@ Response (상품 상세):
       "value": 3.5,
       "amount": 3.8
     },
+    "tag_counts": {
+      "taste_good": 32,
+      "value_good": 24,
+      "amount_small": 12
+    },
     "repurchase_rate": 78.5,
+    "my_review": {
+      "exists": false,
+      "review_id": null
+    },
     "retailers": [
       {
         "retailer_id": 1,
@@ -546,6 +573,10 @@ Response (상품 상세):
   }
 }
 ```
+
+> 📌 상품 상세 UX 상세 설계: [PRODUCT_DETAIL_UX.md](./PRODUCT_DETAIL_UX.md)
+>
+> 섹션 구조, 케이스별 리뷰 전환 UI, 상단/하단 CTA 전략, 리뷰 작성 진입 플로우 상세 정의.
 
 ### 리뷰
 

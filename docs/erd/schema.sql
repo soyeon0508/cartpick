@@ -67,6 +67,7 @@ CREATE TABLE products (
     category_id INTEGER NOT NULL REFERENCES categories(id),
     name VARCHAR(200) NOT NULL,
     normalized_name VARCHAR(200) NOT NULL,
+    summary_line VARCHAR(200),
     description TEXT,
     image_url TEXT,
     barcode VARCHAR(50),

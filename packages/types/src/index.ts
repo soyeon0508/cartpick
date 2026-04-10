@@ -139,6 +139,7 @@ export interface Product {
   categoryId: number;
   name: string;
   normalizedName: string;
+  summaryLine: string | null;
   description: string | null;
   imageUrl: string | null;
   barcode: string | null;
@@ -220,7 +221,12 @@ export interface ProductDetailResponse {
       value: number;
       amount: number;
     };
+    tagCounts: Record<string, number>;
     repurchaseRate: number;
+    myReview: {
+      exists: boolean;
+      reviewId: number | null;
+    };
     retailers: Array<{
       retailerId: number;
       retailerName: string;

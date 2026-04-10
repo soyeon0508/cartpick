@@ -1,0 +1,6 @@
+{
+  "name": "@cartpick/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared ESLint configuration"
+}

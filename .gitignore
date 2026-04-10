@@ -1,40 +1,96 @@
+# ============================================
 # Dependencies
+# ============================================
 node_modules/
 .pnpm-store/
+.yarn/
 
+# ============================================
 # Build outputs
+# ============================================
 dist/
 .next/
 .turbo/
 build/
+out/
+*.tsbuildinfo
 
-# Environment
+# ============================================
+# Environment & Secrets
+# ============================================
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+*.pem
+*.key
+*.p12
+*.mobileprovision
 
-# IDE
+# ============================================
+# IDE / Editor
+# ============================================
 .idea/
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
+# ============================================
 # OS
+# ============================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
+# ============================================
 # Logs
+# ============================================
+logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Test
+# ============================================
+# Test / Coverage
+# ============================================
 coverage/
+.nyc_output/
+*.lcov
 
-# Prisma
+# ============================================
+# Prisma (apps/api)
+# ============================================
 apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+apps/api/prisma/migrations/dev/
 
-# Flutter
+# ============================================
+# NestJS
+# ============================================
+apps/api/dist/
+
+# ============================================
+# Next.js (apps/admin)
+# ============================================
+apps/admin/.next/
+apps/admin/out/
+apps/admin/next-env.d.ts
+
+# ============================================
+# Flutter (apps/mobile)
+# ============================================
+# Dart/Flutter
 apps/mobile/.dart_tool/
 apps/mobile/.packages
 apps/mobile/.pub-cache/
@@ -42,3 +98,36 @@ apps/mobile/.pub/
 apps/mobile/build/
 apps/mobile/.flutter-plugins
 apps/mobile/.flutter-plugins-dependencies
+apps/mobile/pubspec.lock
+apps/mobile/.metadata
+
+# iOS
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/ios/Flutter/Flutter.framework
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/ios/Runner.xcworkspace/xcuserdata/
+apps/mobile/ios/Runner.xcodeproj/xcuserdata/
+apps/mobile/ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Android
+apps/mobile/android/.gradle/
+apps/mobile/android/captures/
+apps/mobile/android/gradlew
+apps/mobile/android/gradlew.bat
+apps/mobile/android/local.properties
+apps/mobile/android/**/GeneratedPluginRegistrant.java
+apps/mobile/android/key.properties
+apps/mobile/android/app/debug
+apps/mobile/android/app/profile
+apps/mobile/android/app/release
+apps/mobile/**/*.keystore
+apps/mobile/**/*.jks
+
+# ============================================
+# Temporary files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.bak

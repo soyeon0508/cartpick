@@ -1,5 +1,21 @@
 # 마트/편의점 상품 리뷰 앱 - PRD 초안
 
+## 관련 문서
+
+| 주제 | 문서 |
+|------|------|
+| GTM 전략 | [GTM_STRATEGY.md](./GTM_STRATEGY.md) |
+| 홈 UX | [HOME_UX.md](./HOME_UX.md) |
+| 상품 상세 UX | [PRODUCT_DETAIL_UX.md](./PRODUCT_DETAIL_UX.md) |
+| 리뷰 작성 UX | [REVIEW_COMPOSE_UX.md](./REVIEW_COMPOSE_UX.md) |
+| 관리자 콘솔 | [ADMIN_CONSOLE.md](./ADMIN_CONSOLE.md) |
+| 백엔드 아키텍처 | [../BACKEND_ARCHITECTURE.md](../BACKEND_ARCHITECTURE.md) |
+| 운영 정책 | [../OPERATIONS_POLICY.md](../OPERATIONS_POLICY.md) |
+| 레포 관리 전략 | [../REPO_STRATEGY.md](../REPO_STRATEGY.md) |
+| ERD SQL | [../erd/schema.sql](../erd/schema.sql) |
+
+---
+
 ## A. 서비스 한 줄 정의
 
 > **"사기 전에 먹어본 사람한테 물어보자"** — 마트·편의점 상품의 실구매 리뷰를 한곳에서 확인하고, 내 경험도 공유할 수 있는 상품 리뷰 플랫폼
@@ -182,6 +198,7 @@ MVP에서는 텍스트 리뷰만이지만, 테이블 설계 시 확장을 고려
 | `home_sections` | 홈 섹션 정의 (편집 홈) | **Must (Admin)** |
 | `home_section_items` | 수동 섹션의 상품 연결 | **Must (Admin)** |
 | `product_aliases` | 상품 병합 후 별칭 관리 | **Must (Admin)** |
+| `product_merge_histories` | 상품 병합 이력 | **Must (Admin)** |
 | `admins` | 관리자 계정 | **Must (Admin)** |
 | `admin_logs` | 관리자 작업 로그 | **Must (Admin)** |
 | `product_images` | 상품 이미지 (복수) | Post-MVP |

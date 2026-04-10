@@ -275,6 +275,18 @@ CREATE TABLE product_aliases (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Product Merge Histories (상품 병합 이력)
+CREATE TABLE product_merge_histories (
+    id SERIAL PRIMARY KEY,
+    source_product_id INTEGER NOT NULL,
+    target_product_id INTEGER NOT NULL REFERENCES products(id),
+    merged_by INTEGER REFERENCES admins(id),
+    reason TEXT,
+    moved_review_count INTEGER NOT NULL DEFAULT 0,
+    moved_retailer_product_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Review Reports
 CREATE TABLE review_reports (
     id SERIAL PRIMARY KEY,
@@ -322,6 +334,14 @@ CREATE INDEX idx_admin_logs_target ON admin_logs(target_type, target_id);
 CREATE INDEX idx_home_sections_country_order ON home_sections(country_id, is_active, display_order);
 CREATE INDEX idx_home_section_items_section ON home_section_items(section_id, display_order);
 CREATE INDEX idx_product_aliases_product ON product_aliases(product_id);
+CREATE INDEX idx_product_merge_histories_target ON product_merge_histories(target_product_id);
+CREATE INDEX idx_product_merge_histories_source ON product_merge_histories(source_product_id);
+
+-- Full-text search (pg_trgm)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_products_name_trgm ON products USING gin (normalized_name gin_trgm_ops);
+CREATE INDEX idx_brands_name_trgm ON brands USING gin (name gin_trgm_ops);
+CREATE INDEX idx_product_aliases_trgm ON product_aliases USING gin (alias_name gin_trgm_ops);
 
 -- ============================================
 -- Seed Data (Korea MVP)

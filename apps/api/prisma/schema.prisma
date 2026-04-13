@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Minimal schema for TASK 1 bootstrap verification.
+// Full schema will be defined in TASK 2.
+
+model Country {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(2)
+  nameKo       String   @map("name_ko") @db.VarChar(50)
+  nameEn       String   @map("name_en") @db.VarChar(50)
+  currencyCode String   @map("currency_code") @db.VarChar(3)
+  languageCode String   @map("language_code") @db.VarChar(5)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("countries")
+}

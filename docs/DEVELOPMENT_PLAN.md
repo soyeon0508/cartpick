@@ -65,11 +65,12 @@
 
 ## 브랜치 전략
 
-M1은 main에 직접 커밋 (설정/뼈대 작업).
-M2부터 feature branch 사용:
-- `feat/auth-kakao`
-- `feat/review-crud`
-- `feat/home-api`
+마일스톤별 브랜치 사용:
+- `M1` — 뼈대 작업
+- `M2` — Auth + 리뷰
+- `M3` — 홈 + 검색 + 관리자 확장
+
+마일스톤 완료 시 main에 머지.
 
 ## 커밋 단위
 

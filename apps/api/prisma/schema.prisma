@@ -7,8 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Minimal schema for TASK 1 bootstrap verification.
-// Full schema will be defined in TASK 2.
+// ─────────────────────────────────────────────
+// 국가
+// ─────────────────────────────────────────────
 
 model Country {
   id           Int      @id @default(autoincrement())
@@ -21,5 +22,453 @@ model Country {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  retailers  Retailer[]
+  categories Category[]
+  products   Product[]
+  users      User[]
+
   @@map("countries")
+}
+
+// ─────────────────────────────────────────────
+// 리테일러
+// ─────────────────────────────────────────────
+
+enum RetailerType {
+  convenience_store
+  supermarket
+  warehouse
+  online
+
+  @@map("retailer_type")
+}
+
+enum LaunchStatus {
+  active
+  coming_soon
+  inactive
+
+  @@map("launch_status")
+}
+
+model Retailer {
+  id           Int          @id @default(autoincrement())
+  countryId    Int          @map("country_id")
+  name         String       @db.VarChar(50)
+  slug         String       @unique @db.VarChar(50)
+  retailerType RetailerType @map("retailer_type")
+  logoUrl      String?      @map("logo_url") @db.VarChar(500)
+  launchStatus LaunchStatus @default(active) @map("launch_status")
+  displayOrder Int          @default(0) @map("display_order")
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  country          Country           @relation(fields: [countryId], references: [id])
+  retailerProducts RetailerProduct[]
+  reviews          Review[]
+
+  @@index([countryId, isActive, displayOrder], map: "idx_retailers_country")
+  @@map("retailers")
+}
+
+// ─────────────────────────────────────────────
+// 브랜드
+// ─────────────────────────────────────────────
+
+model Brand {
+  id       Int      @id @default(autoincrement())
+  name     String   @db.VarChar(100)
+  nameEn   String?  @map("name_en") @db.VarChar(100)
+  slug     String   @unique @db.VarChar(100)
+  logoUrl  String?  @map("logo_url") @db.VarChar(500)
+  isActive Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("brands")
+}
+
+// ─────────────────────────────────────────────
+// 카테고리 (최대 2단계)
+// ─────────────────────────────────────────────
+
+model Category {
+  id           Int      @id @default(autoincrement())
+  countryId    Int      @map("country_id")
+  parentId     Int?     @map("parent_id")
+  name         String   @db.VarChar(50)
+  slug         String   @unique @db.VarChar(50)
+  depth        Int      @default(0)
+  displayOrder Int      @default(0) @map("display_order")
+  iconUrl      String?  @map("icon_url") @db.VarChar(500)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  country  Country    @relation(fields: [countryId], references: [id])
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([countryId, parentId, displayOrder], map: "idx_categories_country")
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────────
+// 상품
+// ─────────────────────────────────────────────
+
+enum ProductStatus {
+  draft
+  active
+  inactive
+
+  @@map("product_status")
+}
+
+model Product {
+  id             Int           @id @default(autoincrement())
+  countryId      Int           @map("country_id")
+  brandId        Int?          @map("brand_id")
+  categoryId     Int           @map("category_id")
+  name           String        @db.VarChar(200)
+  normalizedName String        @map("normalized_name") @db.VarChar(200)
+  description    String?       @db.VarChar(2000)
+  imageUrl       String?       @map("image_url") @db.VarChar(500)
+  barcode        String?       @db.VarChar(50)
+  volumeValue    String?       @map("volume_value") @db.VarChar(20)
+  volumeUnit     String?       @map("volume_unit") @db.VarChar(10)
+  packageType    String?       @map("package_type") @db.VarChar(30)
+  status         ProductStatus @default(draft)
+  reviewCount    Int           @default(0) @map("review_count")
+  averageRating  Decimal       @default(0) @map("average_rating") @db.Decimal(2, 1)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  country          Country           @relation(fields: [countryId], references: [id])
+  brand            Brand?            @relation(fields: [brandId], references: [id])
+  category         Category          @relation(fields: [categoryId], references: [id])
+  retailerProducts RetailerProduct[]
+  reviews          Review[]
+  bookmarks        Bookmark[]
+
+  @@index([categoryId, countryId, status], map: "idx_products_category")
+  @@index([brandId, countryId], map: "idx_products_brand")
+  @@index([normalizedName], map: "idx_products_normalized_name")
+  @@map("products")
+}
+
+// ─────────────────────────────────────────────
+// 리테일러-상품 연결
+// ─────────────────────────────────────────────
+
+enum SourceType {
+  manual
+  crawled
+
+  @@map("source_type")
+}
+
+model RetailerProduct {
+  id                  Int        @id @default(autoincrement())
+  retailerId          Int        @map("retailer_id")
+  productId           Int        @map("product_id")
+  retailerProductName String?    @map("retailer_product_name") @db.VarChar(200)
+  retailerProductUrl  String?    @map("retailer_product_url") @db.VarChar(500)
+  price               Int?
+  salePrice           Int?       @map("sale_price")
+  currencyCode        String     @default("KRW") @map("currency_code") @db.VarChar(3)
+  isAvailable         Boolean    @default(true) @map("is_available")
+  isNew               Boolean    @default(false) @map("is_new")
+  isLimited           Boolean    @default(false) @map("is_limited")
+  sourceType          SourceType @default(manual) @map("source_type")
+  lastSyncedAt        DateTime?  @map("last_synced_at")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  retailer Retailer @relation(fields: [retailerId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([retailerId, productId])
+  @@index([retailerId, isAvailable], map: "idx_retailer_products_retailer_id")
+  @@map("retailer_products")
+}
+
+// ─────────────────────────────────────────────
+// 유저
+// ─────────────────────────────────────────────
+
+enum SocialProvider {
+  kakao
+  apple
+
+  @@map("social_provider")
+}
+
+enum UserStatus {
+  active
+  suspended
+  withdrawn
+
+  @@map("user_status")
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  email          String?        @db.VarChar(255)
+  socialProvider SocialProvider? @map("social_provider")
+  socialId       String?        @map("social_id") @db.VarChar(255)
+  nickname       String         @unique @db.VarChar(30)
+  profileImage   String?        @map("profile_image") @db.VarChar(500)
+  countryId      Int?           @map("country_id")
+  isSeed         Boolean        @default(false) @map("is_seed")
+  status         UserStatus     @default(active)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  country       Country?       @relation(fields: [countryId], references: [id])
+  reviews       Review[]
+  reviewLikes   ReviewLike[]
+  bookmarks     Bookmark[]
+  reviewReports ReviewReport[]
+  userBadges    UserBadge[]
+
+  @@unique([socialProvider, socialId])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// 관리자
+// ─────────────────────────────────────────────
+
+model Admin {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String   @db.VarChar(50)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  adminLogs     AdminLog[]
+  resolvedReports ReviewReport[] @relation("ResolvedByAdmin")
+
+  @@map("admins")
+}
+
+// ─────────────────────────────────────────────
+// 리뷰
+// ─────────────────────────────────────────────
+
+enum ModerationStatus {
+  visible
+  hidden
+  reported
+
+  @@map("moderation_status")
+}
+
+model Review {
+  id               Int              @id @default(autoincrement())
+  userId           Int              @map("user_id")
+  productId        Int              @map("product_id")
+  retailerId       Int?             @map("retailer_id")
+  rating           Int              @db.SmallInt
+  body             String           @default("") @db.VarChar(2000)
+  repurchaseIntent Boolean?         @map("repurchase_intent")
+  moderationStatus ModerationStatus @default(visible) @map("moderation_status")
+  reportedCount    Int              @default(0) @map("reported_count")
+  likeCount        Int              @default(0) @map("like_count")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  user       User          @relation(fields: [userId], references: [id])
+  product    Product       @relation(fields: [productId], references: [id])
+  retailer   Retailer?     @relation(fields: [retailerId], references: [id])
+  tags       ReviewTag[]
+  likes      ReviewLike[]
+  reports    ReviewReport[]
+
+  @@unique([userId, productId])
+  @@index([productId, moderationStatus, createdAt(sort: Desc)], map: "idx_reviews_product_id")
+  @@index([productId, retailerId], map: "idx_reviews_product_retailer")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_reviews_user")
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────────
+// 리뷰 태그 (태그 기반 경량 리뷰)
+// ─────────────────────────────────────────────
+
+model ReviewTag {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int      @map("review_id")
+  tagCode   String   @map("tag_code") @db.VarChar(30)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, tagCode])
+  @@index([tagCode], map: "idx_review_tags_tag")
+  @@map("review_tags")
+}
+
+// ─────────────────────────────────────────────
+// 리뷰 좋아요
+// ─────────────────────────────────────────────
+
+model ReviewLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  reviewId  Int      @map("review_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id])
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reviewId])
+  @@map("review_likes")
+}
+
+// ─────────────────────────────────────────────
+// 즐겨찾기
+// ─────────────────────────────────────────────
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  productId Int      @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt(sort: Desc)], map: "idx_bookmarks_user")
+  @@map("bookmarks")
+}
+
+// ─────────────────────────────────────────────
+// 리뷰 신고
+// ─────────────────────────────────────────────
+
+enum ReportStatus {
+  pending
+  resolved
+  dismissed
+
+  @@map("report_status")
+}
+
+model ReviewReport {
+  id             Int          @id @default(autoincrement())
+  reviewId       Int          @map("review_id")
+  reporterUserId Int          @map("reporter_user_id")
+  reason         String       @db.VarChar(50)
+  description    String?      @db.VarChar(500)
+  status         ReportStatus @default(pending)
+  resolvedBy     Int?         @map("resolved_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  resolvedAt     DateTime?    @map("resolved_at")
+
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporter User   @relation(fields: [reporterUserId], references: [id])
+  resolver Admin? @relation("ResolvedByAdmin", fields: [resolvedBy], references: [id])
+
+  @@map("review_reports")
+}
+
+// ─────────────────────────────────────────────
+// 뱃지
+// ─────────────────────────────────────────────
+
+model BadgeType {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(50)
+  description String?  @db.VarChar(200)
+  iconUrl     String?  @map("icon_url") @db.VarChar(500)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userBadges UserBadge[]
+
+  @@map("badge_types")
+}
+
+model UserBadge {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  badgeTypeId Int      @map("badge_type_id")
+  awardedAt   DateTime @default(now()) @map("awarded_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+  badgeType BadgeType @relation(fields: [badgeTypeId], references: [id])
+
+  @@unique([userId, badgeTypeId])
+  @@map("user_badges")
+}
+
+// ─────────────────────────────────────────────
+// 홈 섹션 (편집 홈)
+// ─────────────────────────────────────────────
+
+enum SectionType {
+  popular_products
+  new_products
+  top_rated
+  editor_pick
+  custom
+
+  @@map("section_type")
+}
+
+model HomeSection {
+  id           Int         @id @default(autoincrement())
+  countryCode  String      @map("country_code") @db.VarChar(2)
+  sectionType  SectionType @map("section_type")
+  title        String      @db.VarChar(100)
+  subtitle     String?     @db.VarChar(200)
+  displayOrder Int         @default(0) @map("display_order")
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  items HomeSectionItem[]
+
+  @@map("home_sections")
+}
+
+model HomeSectionItem {
+  id            Int      @id @default(autoincrement())
+  homeSectionId Int      @map("home_section_id")
+  productId     Int      @map("product_id")
+  displayOrder  Int      @default(0) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  homeSection HomeSection @relation(fields: [homeSectionId], references: [id], onDelete: Cascade)
+
+  @@map("home_section_items")
+}
+
+// ─────────────────────────────────────────────
+// 관리자 로그
+// ─────────────────────────────────────────────
+
+model AdminLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int      @map("admin_id")
+  action     String   @db.VarChar(50)
+  targetType String   @map("target_type") @db.VarChar(50)
+  targetId   Int?     @map("target_id")
+  detail     Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin Admin @relation(fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt(sort: Desc)], map: "idx_admin_logs_admin")
+  @@map("admin_logs")
 }

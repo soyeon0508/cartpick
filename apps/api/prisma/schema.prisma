@@ -235,9 +235,30 @@ model User {
   bookmarks     Bookmark[]
   reviewReports ReviewReport[]
   userBadges    UserBadge[]
+  refreshTokens RefreshToken[]
 
   @@unique([socialProvider, socialId])
   @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// 리프레시 토큰 (유저)
+// ─────────────────────────────────────────────
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  userAgent String?   @map("user_agent") @db.VarChar(300)
+  ipAddress String?   @map("ip_address") @db.VarChar(45)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt], map: "idx_refresh_tokens_user")
+  @@map("refresh_tokens")
 }
 
 // ─────────────────────────────────────────────

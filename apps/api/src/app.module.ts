@@ -4,6 +4,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health.controller';
 import { AdminAuthModule } from './admin/auth/admin-auth.module';
 import { AdminProductsModule } from './admin/products/admin-products.module';
+import { PublicProductsModule } from './public/products/public-products.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AdminProductsModule } from './admin/products/admin-products.module';
     PrismaModule,
     AdminAuthModule,
     AdminProductsModule,
+    PublicProductsModule,
   ],
   controllers: [HealthController],
 })

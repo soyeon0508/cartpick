@@ -853,15 +853,145 @@ describe('User Reviews API (create → update → delete)', () => {
     });
 
     it('does not include hidden reviews', async () => {
-      // This test assumes you can create a hidden review via Prisma for testing
-      // For now, this is a placeholder that verifies visible reviews are returned
+      // Create a hidden review directly in Prisma
+      await prisma.review.create({
+        data: {
+          userId,
+          productId,
+          retailerId,
+          rating: 3,
+          body: '숨겨진 리뷰',
+          moderationStatus: 'hidden',
+        },
+      });
+
       const res = await request(app.getHttpServer())
         .get(`/api/v1/products/${productId}/reviews`)
         .expect(200);
 
-      // All returned reviews should have moderationStatus: 'visible'
-      // (You can add this field to the response if needed for verification)
-      expect(res.body.success).toBe(true);
+      // Hidden reviews should not be included
+      const hasHiddenReview = res.body.data.reviews.some(
+        (r: any) => r.body === '숨겨진 리뷰',
+      );
+      expect(hasHiddenReview).toBe(false);
+
+      // Clean up
+      await prisma.review.delete({
+        where: {
+          userId_productId: {
+            userId,
+            productId,
+          },
+        },
+      });
+    });
+
+    it('handles invalid sort parameter gracefully', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?sort=invalid`)
+        .expect(400);
+    });
+
+    it('handles limit > 50 with validation error', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?limit=51`)
+        .expect(400);
+    });
+
+    it('handles page < 1 with validation error', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?page=0`)
+        .expect(400);
+    });
+
+    it('returns empty array when product has no reviews', async () => {
+      const emptyProduct = await prisma.product.create({
+        data: {
+          countryId: testCountryId,
+          brandId,
+          categoryId,
+          name: '리뷰없는상품',
+          normalizedName: '리뷰없는상품',
+          status: 'active',
+        },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${emptyProduct.id}/reviews`)
+        .expect(200);
+
+      expect(res.body.data.reviews).toEqual([]);
+      expect(res.body.data.total).toBe(0);
+
+      // Clean up
+      await prisma.product.delete({ where: { id: emptyProduct.id } });
+    });
+
+    it('paginates correctly with page > 1', async () => {
+      // Create multiple reviews to test pagination
+      const reviews = [];
+      for (let i = 0; i < 25; i++) {
+        const user = await prisma.user.create({
+          data: {
+            email: `pag-test-${i}-${Date.now()}@example.com`,
+            passwordHash: 'hashed-password',
+            nickname: `페이지유저${i}${Date.now()}`,
+            status: 'active',
+          },
+        });
+
+        const review = await prisma.review.create({
+          data: {
+            userId: user.id,
+            productId,
+            rating: (i % 5) + 1,
+            body: `리뷰 ${i}`,
+            moderationStatus: 'visible',
+          },
+        });
+        reviews.push({ review, userId: user.id });
+      }
+
+      // Get page 1
+      const page1Res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?page=1&limit=10`)
+        .expect(200);
+
+      expect(page1Res.body.data.reviews).toHaveLength(10);
+      expect(page1Res.body.data.page).toBe(1);
+      expect(page1Res.body.data.total).toBeGreaterThanOrEqual(25);
+
+      // Get page 2
+      const page2Res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?page=2&limit=10`)
+        .expect(200);
+
+      expect(page2Res.body.data.reviews).toHaveLength(10);
+      expect(page2Res.body.data.page).toBe(2);
+
+      // Verify different reviews
+      const page1Ids = page1Res.body.data.reviews.map((r: any) => r.id);
+      const page2Ids = page2Res.body.data.reviews.map((r: any) => r.id);
+      expect(page1Ids).not.toEqual(page2Ids);
+
+      // Clean up
+      for (const { review, userId: uid } of reviews) {
+        await prisma.review.delete({ where: { id: review.id } });
+        await prisma.user.delete({ where: { id: uid } });
+      }
+    });
+
+    it('includes retailer and tags in response', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews`)
+        .expect(200);
+
+      if (res.body.data.reviews.length > 0) {
+        const review = res.body.data.reviews[0];
+        expect(review).toHaveProperty('retailer');
+        expect(review).toHaveProperty('tags');
+        expect(Array.isArray(review.tags)).toBe(true);
+      }
     });
   });
 
@@ -925,14 +1055,77 @@ describe('User Reviews API (create → update → delete)', () => {
     });
 
     it('returns only current user review (isolation)', async () => {
-      // Ensure we get only the logged-in user's review
+      // Create another user with a review on the same product
+      const user2 = await prisma.user.create({
+        data: {
+          email: `iso-test-${Date.now()}@example.com`,
+          passwordHash: 'hashed-password',
+          nickname: `격리테스트${Date.now()}`,
+          status: 'active',
+        },
+      });
+
+      const user2Review = await prisma.review.create({
+        data: {
+          userId: user2.id,
+          productId,
+          rating: 4,
+          body: '다른유저리뷰',
+        },
+      });
+
+      // Current user should get their own review, not user2's
       const res = await request(app.getHttpServer())
         .get(`/api/v1/products/${productId}/reviews/me`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       expect(res.body.data.id).toBeDefined();
-      // The user should only see their own review
+      expect(res.body.data.body).not.toBe('다른유저리뷰');
+
+      // Clean up
+      await prisma.review.delete({ where: { id: user2Review.id } });
+      await prisma.user.delete({ where: { id: user2.id } });
+    });
+
+    it('returns all required fields for my review', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.data).toMatchObject({
+        id: expect.any(Number),
+        rating: expect.any(Number),
+        body: expect.any(String),
+        tags: expect.any(Array),
+        likeCount: expect.any(Number),
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      });
+    });
+
+    it('returns retailer info if review has retailer', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      // Review has retailer from create request
+      expect(res.body.data.retailer).toBeDefined();
+      if (res.body.data.retailer) {
+        expect(res.body.data.retailer).toHaveProperty('id');
+        expect(res.body.data.retailer).toHaveProperty('name');
+      }
+    });
+
+    it('returns repurchaseIntent field', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.data).toHaveProperty('repurchaseIntent');
     });
   });
 });

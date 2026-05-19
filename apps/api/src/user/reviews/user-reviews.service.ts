@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { QueryReviewsDto, SortOrder } from './dto/query-reviews.dto';
 import { Prisma } from '@prisma/client';
 
 const REVIEW_CREATE_MAX_RETRIES = 3;
@@ -322,6 +323,136 @@ export class UserReviewsService {
       // Update product aggregates
       await this.updateProductAggregates(tx, productId);
     });
+  }
+
+  async findAllByProduct(productId: number, query: QueryReviewsDto) {
+    // Check if product exists
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const { page = 1, limit = 20, sort = SortOrder.RECENT } = query;
+    const skip = (page - 1) * limit;
+
+    // Determine sort order
+    let orderBy: Prisma.ReviewOrderByWithRelationInput[] | Prisma.ReviewOrderByWithRelationInput;
+    if (sort === SortOrder.HELPFUL) {
+      orderBy = [
+        { likeCount: 'desc' as const },
+        { createdAt: 'desc' as const },
+      ];
+    } else {
+      orderBy = { createdAt: 'desc' as const };
+    }
+
+    // Fetch reviews with pagination
+    const [reviews, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where: {
+          productId,
+          moderationStatus: 'visible',
+        },
+        include: {
+          tags: {
+            select: {
+              tagCode: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              nickname: true,
+              profileImage: true,
+            },
+          },
+          retailer: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      this.prisma.review.count({
+        where: {
+          productId,
+          moderationStatus: 'visible',
+        },
+      }),
+    ]);
+
+    return {
+      reviews: reviews.map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        body: review.body,
+        tags: review.tags.map((t) => t.tagCode),
+        repurchaseIntent: review.repurchaseIntent,
+        likeCount: review.likeCount,
+        retailer: review.retailer,
+        user: review.user,
+        createdAt: review.createdAt,
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async findMyReview(userId: number, productId: number) {
+    // Check if product exists
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const review = await this.prisma.review.findUnique({
+      where: {
+        userId_productId: {
+          userId,
+          productId,
+        },
+      },
+      include: {
+        tags: {
+          select: {
+            tagCode: true,
+          },
+        },
+        retailer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    return {
+      id: review.id,
+      rating: review.rating,
+      body: review.body,
+      tags: review.tags.map((t) => t.tagCode),
+      repurchaseIntent: review.repurchaseIntent,
+      likeCount: review.likeCount,
+      retailer: review.retailer,
+      createdAt: review.createdAt,
+      updatedAt: review.updatedAt,
+    };
   }
 
   private async updateProductAggregates(tx: Prisma.TransactionClient, productId: number) {

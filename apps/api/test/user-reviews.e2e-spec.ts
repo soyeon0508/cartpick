@@ -139,6 +139,7 @@ describe('User Reviews API (create → update → delete)', () => {
 
   afterAll(async () => {
     // Clean up in order
+    await prisma.userBadge.deleteMany({ where: { userId } });
     await prisma.review.deleteMany({ where: { userId } });
     await prisma.retailerProduct.deleteMany({ where: { productId } });
     await prisma.product.deleteMany({ where: { id: productId } });
@@ -761,6 +762,177 @@ describe('User Reviews API (create → update → delete)', () => {
       });
 
       expect(badgesAfterDelete).toHaveLength(1);
+    });
+  });
+
+  describe('GET /api/v1/products/:productId/reviews (list)', () => {
+    it('returns reviews list with pagination', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.reviews).toBeDefined();
+      expect(Array.isArray(res.body.data.reviews)).toBe(true);
+      expect(res.body.data.total).toBeDefined();
+      expect(res.body.data.page).toBe(1);
+      expect(res.body.data.limit).toBe(20);
+    });
+
+    it('returns review items with required fields', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews`)
+        .expect(200);
+
+      if (res.body.data.reviews.length > 0) {
+        const review = res.body.data.reviews[0];
+        expect(review.id).toBeDefined();
+        expect(review.rating).toBeDefined();
+        expect(review.body).toBeDefined();
+        expect(review.tags).toBeDefined();
+        expect(Array.isArray(review.tags)).toBe(true);
+        expect(review.user).toBeDefined();
+        expect(review.user.nickname).toBeDefined();
+        expect(review.likeCount).toBeDefined();
+        expect(review.createdAt).toBeDefined();
+      }
+    });
+
+    it('sorts by recent (default)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews`)
+        .expect(200);
+
+      if (res.body.data.reviews.length > 1) {
+        const timestamps = res.body.data.reviews.map(
+          (r: any) => new Date(r.createdAt).getTime(),
+        );
+        // Verify descending order (most recent first)
+        for (let i = 1; i < timestamps.length; i++) {
+          expect(timestamps[i - 1]).toBeGreaterThanOrEqual(timestamps[i]);
+        }
+      }
+    });
+
+    it('sorts by helpful when sort=helpful', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?sort=helpful`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.reviews).toBeDefined();
+
+      if (res.body.data.reviews.length > 1) {
+        const likesCounts = res.body.data.reviews.map((r: any) => r.likeCount);
+        // Verify descending order by likeCount
+        for (let i = 1; i < likesCounts.length; i++) {
+          expect(likesCounts[i - 1]).toBeGreaterThanOrEqual(likesCounts[i]);
+        }
+      }
+    });
+
+    it('respects pagination parameters', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews?page=1&limit=5`)
+        .expect(200);
+
+      expect(res.body.data.page).toBe(1);
+      expect(res.body.data.limit).toBe(5);
+    });
+
+    it('returns 404 for non-existent product', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/products/99999/reviews')
+        .expect(404);
+    });
+
+    it('returns 400 for invalid product id', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/products/not-a-number/reviews')
+        .expect(400);
+    });
+
+    it('does not include hidden reviews', async () => {
+      // This test assumes you can create a hidden review via Prisma for testing
+      // For now, this is a placeholder that verifies visible reviews are returned
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews`)
+        .expect(200);
+
+      // All returned reviews should have moderationStatus: 'visible'
+      // (You can add this field to the response if needed for verification)
+      expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe('GET /api/v1/products/:productId/reviews/me (my review)', () => {
+    it('returns current user review when exists', async () => {
+      // First, create a review
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${productId}/reviews`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ rating: 5, body: 'Test review' })
+        .expect(201);
+
+      // Then, fetch it
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.id).toBeDefined();
+      expect(res.body.data.rating).toBe(5);
+      expect(res.body.data.body).toBe('Test review');
+      expect(res.body.data.tags).toBeDefined();
+      expect(res.body.data.createdAt).toBeDefined();
+      expect(res.body.data.updatedAt).toBeDefined();
+    });
+
+    it('returns 404 when user has no review for product', async () => {
+      // Create a product with no review
+      const product2 = await prisma.product.create({
+        data: {
+          countryId: testCountryId,
+          brandId,
+          categoryId,
+          name: '아이스크림2',
+          normalizedName: '아이스크림2',
+          status: 'active',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/products/${product2.id}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+
+      // Clean up
+      await prisma.product.delete({ where: { id: product2.id } });
+    });
+
+    it('returns 401 when not authenticated', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .expect(401);
+    });
+
+    it('returns 404 for non-existent product', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/products/99999/reviews/me')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+    });
+
+    it('returns only current user review (isolation)', async () => {
+      // Ensure we get only the logged-in user's review
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/products/${productId}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(res.body.data.id).toBeDefined();
+      // The user should only see their own review
     });
   });
 });

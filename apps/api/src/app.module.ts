@@ -9,6 +9,7 @@ import { UserAuthModule } from './user/auth/user-auth.module';
 import { UserReviewsModule } from './user/reviews/user-reviews.module';
 import { ReviewLikesModule } from './review-likes/review-likes.module';
 import { ProductBookmarksModule } from './user/bookmarks/product-bookmarks.module';
+import { ReviewReportsModule } from './review-reports/review-reports.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ProductBookmarksModule } from './user/bookmarks/product-bookmarks.modul
     UserReviewsModule,
     ReviewLikesModule,
     ProductBookmarksModule,
+    ReviewReportsModule,
   ],
   controllers: [HealthController],
 })

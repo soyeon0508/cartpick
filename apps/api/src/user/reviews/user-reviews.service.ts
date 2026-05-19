@@ -58,6 +58,16 @@ export class UserReviewsService {
         throw new ConflictException('User has already reviewed this product');
       }
 
+      // Check if this is the first visible review for the product
+      const visibleReviewCount = await tx.review.count({
+        where: {
+          productId,
+          moderationStatus: 'visible',
+        },
+      });
+
+      const isFirstReview = visibleReviewCount === 0;
+
       // Create review
       const review = await tx.review.create({
         data: {
@@ -79,6 +89,31 @@ export class UserReviewsService {
             tagCode,
           })),
         });
+      }
+
+      // Award first reviewer badge if this is the first visible review
+      if (isFirstReview) {
+        const badgeType = await tx.badgeType.findUnique({
+          where: { code: 'first_reviewer' },
+        });
+
+        if (badgeType) {
+          // Use upsert to prevent duplicate awards (unique constraint on userId + badgeTypeId)
+          await tx.userBadge.upsert({
+            where: {
+              userId_badgeTypeId: {
+                userId,
+                badgeTypeId: badgeType.id,
+              },
+            },
+            update: {},
+            create: {
+              userId,
+              badgeTypeId: badgeType.id,
+            },
+          });
+        }
+        // If badge type doesn't exist, skip awarding (should be created by seed)
       }
 
       // Update product aggregates

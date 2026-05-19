@@ -1,9 +1,10 @@
-import { PrismaClient } from '@prisma/client';
-import * as argon2 from 'argon2';
-import { countries } from './data/countries';
-import { retailers } from './data/retailers';
-import { categories } from './data/categories';
-import { brands } from './data/brands';
+  import { PrismaClient } from '@prisma/client';
+  import * as argon2 from 'argon2';
+  import { countries } from './data/countries';
+  import { retailers } from './data/retailers';
+  import { categories } from './data/categories';
+  import { brands } from './data/brands';
+  import { badgeTypes } from './data/badge-types';
 
 const prisma = new PrismaClient();
 
@@ -76,6 +77,17 @@ async function seedAdmin() {
   console.log(`  admin: ${email} upserted`);
 }
 
+async function seedBadgeTypes() {
+  for (const badgeType of badgeTypes) {
+    await prisma.badgeType.upsert({
+      where: { code: badgeType.code },
+      update: { ...badgeType },
+      create: { ...badgeType },
+    });
+  }
+  console.log(`  badge types: ${badgeTypes.length} upserted`);
+}
+
 async function main() {
   console.log('Seeding CartPick database...');
 
@@ -83,6 +95,7 @@ async function main() {
   await seedRetailers();
   await seedCategories();
   await seedBrands();
+  await seedBadgeTypes();
   await seedAdmin();
 
   console.log('Seed completed.');

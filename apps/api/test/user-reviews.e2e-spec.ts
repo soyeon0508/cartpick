@@ -15,6 +15,7 @@ describe('User Reviews API (create → update → delete)', () => {
   let categoryId: number;
   let brandId: number;
   let accessToken: string;
+  let firstReviewerBadgeTypeId: number;
 
   const testUser = {
     email: `review-test-${Date.now()}@example.com`,
@@ -123,6 +124,17 @@ describe('User Reviews API (create → update → delete)', () => {
       'dev-user-jwt-secret-change-in-production',
       { expiresIn: '30m' },
     );
+
+    // Get the first reviewer badge type ID from seed
+    const badgeType = await prisma.badgeType.findUnique({
+      where: { code: 'first_reviewer' },
+    });
+
+    if (!badgeType) {
+      throw new Error('Badge type first_reviewer should be created by seed');
+    }
+
+    firstReviewerBadgeTypeId = badgeType.id;
   });
 
   afterAll(async () => {
@@ -167,6 +179,7 @@ describe('User Reviews API (create → update → delete)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           rating: 4,
+          
           body: '다른 리뷰',
         })
         .expect(409);
@@ -405,6 +418,266 @@ describe('User Reviews API (create → update → delete)', () => {
 
       expect(product!.reviewCount).toBe(0);
       expect(parseFloat(product!.averageRating.toString())).toBe(0.0);
+    });
+  });
+
+  describe('First Reviewer Badge', () => {
+    let user2Id: number;
+    let user2AccessToken: string;
+    let productForBadges: number;
+    let retailerForBadges: number;
+
+    beforeAll(async () => {
+      // Create a second user for testing
+      const user2 = await prisma.user.create({
+        data: {
+          email: `badge-test-2-${Date.now()}@example.com`,
+          passwordHash: 'hashed-password',
+          nickname: `뱃지테스터2${Date.now()}`,
+          status: 'active',
+        },
+      });
+      user2Id = user2.id;
+
+      // Create retailer for badge tests
+      const retailer = await prisma.retailer.create({
+        data: {
+          countryId: testCountryId,
+          name: 'Seven Eleven',
+          slug: `seven-eleven-${Date.now()}`,
+          retailerType: 'convenience_store',
+        },
+      });
+      retailerForBadges = retailer.id;
+
+      // Create product for badge tests
+      const product = await prisma.product.create({
+        data: {
+          countryId: testCountryId,
+          brandId,
+          categoryId,
+          name: '월드콘',
+          normalizedName: '월드콘',
+          status: 'active',
+        },
+      });
+      productForBadges = product.id;
+
+      // Create retailer-product connection
+      await prisma.retailerProduct.create({
+        data: {
+          retailerId: retailerForBadges,
+          productId: productForBadges,
+        },
+      });
+
+      // Create access token for second user
+      const jwt = require('jsonwebtoken');
+      user2AccessToken = jwt.sign(
+        { sub: user2Id, nickname: 'BadgeTester2', role: 'user' },
+        'dev-user-jwt-secret-change-in-production',
+        { expiresIn: '30m' },
+      );
+    });
+
+    afterAll(async () => {
+      // Clean up badge test data
+      await prisma.userBadge.deleteMany({ where: { userId: user2Id } });
+      await prisma.userBadge.deleteMany({ where: { userId } });
+      await prisma.review.deleteMany({ where: { userId: user2Id } });
+      await prisma.review.deleteMany({ where: { userId, productId: productForBadges } });
+      await prisma.retailerProduct.deleteMany({ where: { productId: productForBadges } });
+      await prisma.product.deleteMany({ where: { id: productForBadges } });
+      await prisma.retailer.deleteMany({ where: { id: retailerForBadges } });
+      await prisma.user.deleteMany({ where: { id: user2Id } });
+    });
+
+    it('awards first_reviewer badge to the first reviewer of a product', async () => {
+      // Create first review
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${productForBadges}/reviews`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          rating: 5,
+          body: '맛있어요',
+        })
+        .expect(201);
+
+      // Verify badge was awarded
+      const userBadges = await prisma.userBadge.findMany({
+        where: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(userBadges).toHaveLength(1);
+    });
+
+    it('does not award first_reviewer badge to a second reviewer', async () => {
+      // Second user creates a review
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${productForBadges}/reviews`)
+        .set('Authorization', `Bearer ${user2AccessToken}`)
+        .send({
+          rating: 4,
+          body: '괜찮아요',
+        })
+        .expect(201);
+
+      // Verify badge was NOT awarded to second user
+      const user2Badges = await prisma.userBadge.findMany({
+        where: {
+          userId: user2Id,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(user2Badges).toHaveLength(0);
+    });
+
+    it('prevents duplicate first_reviewer badges for the same user', async () => {
+      // First user already has the badge from previous test
+      const existingBadges = await prisma.userBadge.findMany({
+        where: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(existingBadges).toHaveLength(1);
+
+      // Try to award another first_reviewer badge (should be prevented by upsert)
+      await prisma.userBadge.upsert({
+        where: {
+          userId_badgeTypeId: {
+            userId,
+            badgeTypeId: firstReviewerBadgeTypeId,
+          },
+        },
+        update: {},
+        create: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      // Verify still only one badge
+      const badgesAfter = await prisma.userBadge.findMany({
+        where: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(badgesAfter).toHaveLength(1);
+    });
+
+    it('awards first_reviewer badge to a different product', async () => {
+      // Create another product
+      const product2 = await prisma.product.create({
+        data: {
+          countryId: testCountryId,
+          brandId,
+          categoryId,
+          name: '설레임',
+          normalizedName: '설레임',
+          status: 'active',
+        },
+      });
+
+      // Create retailer-product connection
+      await prisma.retailerProduct.create({
+        data: {
+          retailerId: retailerForBadges,
+          productId: product2.id,
+        },
+      });
+
+      // Second user creates first review on new product
+      await request(app.getHttpServer())
+        .post(`/api/v1/products/${product2.id}/reviews`)
+        .set('Authorization', `Bearer ${user2AccessToken}`)
+        .send({
+          rating: 5,
+          body: '최고예요',
+        })
+        .expect(201);
+
+      // Verify badge was awarded to second user
+      const user2Badges = await prisma.userBadge.findMany({
+        where: {
+          userId: user2Id,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(user2Badges).toHaveLength(1);
+
+      // Clean up
+      await prisma.review.deleteMany({ where: { userId: user2Id, productId: product2.id } });
+      await prisma.retailerProduct.deleteMany({ where: { productId: product2.id } });
+      await prisma.product.delete({ where: { id: product2.id } });
+    });
+
+    it('does not award badge on review update', async () => {
+      // First user updates their review
+      const initialBadges = await prisma.userBadge.findMany({
+        where: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(initialBadges).toHaveLength(1);
+
+      // Update review
+      await request(app.getHttpServer())
+        .put(`/api/v1/products/${productForBadges}/reviews/me`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          rating: 4,
+          body: '업데이트된 리뷰',
+        })
+        .expect(200);
+
+      // Verify badge count unchanged
+      const badgesAfterUpdate = await prisma.userBadge.findMany({
+        where: {
+          userId,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(badgesAfterUpdate).toHaveLength(1);
+    });
+
+    it('does not remove badge when review is deleted', async () => {
+      // Second user has a badge from previous test
+      const badgesBeforeDelete = await prisma.userBadge.findMany({
+        where: {
+          userId: user2Id,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(badgesBeforeDelete).toHaveLength(1);
+
+      // Delete second user's review
+      await request(app.getHttpServer())
+        .delete(`/api/v1/products/${productForBadges}/reviews/me`)
+        .set('Authorization', `Bearer ${user2AccessToken}`)
+        .expect(204);
+
+      // Verify badge still exists
+      const badgesAfterDelete = await prisma.userBadge.findMany({
+        where: {
+          userId: user2Id,
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(badgesAfterDelete).toHaveLength(1);
     });
   });
 });

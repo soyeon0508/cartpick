@@ -12,6 +12,8 @@ describe('User Reviews API (create → update → delete)', () => {
   let productId: number;
   let retailerId: number;
   let testCountryId: number;
+  let categoryId: number;
+  let brandId: number;
   let accessToken: string;
 
   const testUser = {
@@ -53,17 +55,14 @@ describe('User Reviews API (create → update → delete)', () => {
     });
     userId = user.id;
 
-    // Create test country with unique code (2-char limit)
-    const testCountryCode = `X${String(Date.now()).slice(-1)}`;
-    const country = await prisma.country.create({
-      data: {
-        code: testCountryCode,
-        nameKo: '테스트국가',
-        nameEn: 'Test Country',
-        currencyCode: 'KRW',
-        languageCode: 'ko',
-      },
+    const country = await prisma.country.findUnique({
+      where: { code: 'KR' },
     });
+
+    if (!country) {
+      throw new Error('Seed country KR is required for user review tests');
+    }
+
     testCountryId = country.id;
 
     // Create test retailer
@@ -85,6 +84,7 @@ describe('User Reviews API (create → update → delete)', () => {
         slug: `beverages-${Date.now()}`,
       },
     });
+    categoryId = category.id;
 
     // Create test brand
     const brand = await prisma.brand.create({
@@ -93,6 +93,7 @@ describe('User Reviews API (create → update → delete)', () => {
         slug: `binggrae-${Date.now()}`,
       },
     });
+    brandId = brand.id;
 
     // Create test product
     const product = await prisma.product.create({
@@ -129,18 +130,9 @@ describe('User Reviews API (create → update → delete)', () => {
     await prisma.review.deleteMany({ where: { userId } });
     await prisma.retailerProduct.deleteMany({ where: { productId } });
     await prisma.product.deleteMany({ where: { id: productId } });
-    
-    // Clean up related entities for the test country
-    if (testCountryId) {
-      const brands = await prisma.brand.findMany({ select: { id: true } });
-      if (brands.length > 0) {
-        await prisma.brand.deleteMany({ where: { id: { in: brands.map(b => b.id) } } });
-      }
-      await prisma.category.deleteMany({ where: { countryId: testCountryId } });
-      await prisma.retailer.deleteMany({ where: { countryId: testCountryId } });
-      await prisma.country.deleteMany({ where: { id: testCountryId } });
-    }
-    
+    await prisma.retailer.deleteMany({ where: { id: retailerId } });
+    await prisma.category.deleteMany({ where: { id: categoryId } });
+    await prisma.brand.deleteMany({ where: { id: brandId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await app.close();
   });
@@ -210,6 +202,16 @@ describe('User Reviews API (create → update → delete)', () => {
         .expect(404);
     });
 
+    it('returns 400 with invalid product id', async () => {
+      await request(app.getHttpServer())
+        .post('/api/v1/products/not-a-number/reviews')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          rating: 5,
+        })
+        .expect(400);
+    });
+
     it('returns 404 with non-existent retailer', async () => {
       await request(app.getHttpServer())
         .post(`/api/v1/products/${productId}/reviews`)
@@ -247,14 +249,11 @@ describe('User Reviews API (create → update → delete)', () => {
 
     it('creates review without optional fields', async () => {
       // Create another product for testing
-      const category = await prisma.category.findFirst({ where: { countryId: testCountryId } });
-      const brand = await prisma.brand.findFirst();
-
       const product2 = await prisma.product.create({
         data: {
           countryId: testCountryId,
-          brandId: brand!.id,
-          categoryId: category!.id,
+          brandId,
+          categoryId,
           name: '바밤바',
           normalizedName: '바밤바',
           status: 'active',
@@ -311,14 +310,11 @@ describe('User Reviews API (create → update → delete)', () => {
     });
 
     it('returns 404 when updating non-existent review', async () => {
-      const category = await prisma.category.findFirst({ where: { countryId: testCountryId } });
-      const brand = await prisma.brand.findFirst();
-
       const product3 = await prisma.product.create({
         data: {
           countryId: testCountryId,
-          brandId: brand!.id,
-          categoryId: category!.id,
+          brandId,
+          categoryId,
           name: '스크류바',
           normalizedName: '스크류바',
           status: 'active',

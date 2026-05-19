@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseIntPipe,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -23,18 +24,13 @@ export class UserReviewsController {
 
   @Post()
   async create(
-    @Param('productId') productId: string,
+    @Param('productId', ParseIntPipe) productId: number,
     @Body() dto: CreateReviewDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const parsedProductId = parseInt(productId, 10);
-    if (isNaN(parsedProductId)) {
-      return { success: false, message: 'Invalid product ID' };
-    }
-
     const review = await this.reviewsService.create(
       user.id,
-      parsedProductId,
+      productId,
       dto,
     );
 
@@ -46,18 +42,13 @@ export class UserReviewsController {
 
   @Put('me')
   async update(
-    @Param('productId') productId: string,
+    @Param('productId', ParseIntPipe) productId: number,
     @Body() dto: UpdateReviewDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const parsedProductId = parseInt(productId, 10);
-    if (isNaN(parsedProductId)) {
-      return { success: false, message: 'Invalid product ID' };
-    }
-
     const review = await this.reviewsService.update(
       user.id,
-      parsedProductId,
+      productId,
       dto,
     );
 
@@ -70,14 +61,9 @@ export class UserReviewsController {
   @Delete('me')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(
-    @Param('productId') productId: string,
+    @Param('productId', ParseIntPipe) productId: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const parsedProductId = parseInt(productId, 10);
-    if (isNaN(parsedProductId)) {
-      throw new Error('Invalid product ID');
-    }
-
-    await this.reviewsService.delete(user.id, parsedProductId);
+    await this.reviewsService.delete(user.id, productId);
   }
 }

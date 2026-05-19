@@ -11,6 +11,7 @@ import { ReviewLikesModule } from './review-likes/review-likes.module';
 import { ProductBookmarksModule } from './user/bookmarks/product-bookmarks.module';
 import { ReviewReportsModule } from './review-reports/review-reports.module';
 import { UserProfileModule } from './user/profile/user-profile.module';
+import { UserMeModule } from './user/me/user-me.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UserProfileModule } from './user/profile/user-profile.module';
     ProductBookmarksModule,
     ReviewReportsModule,
     UserProfileModule,
+    UserMeModule,
   ],
   controllers: [HealthController],
 })

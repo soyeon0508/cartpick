@@ -31,7 +31,7 @@ cartpick/
 | Admin Web | Next.js (TypeScript) |
 | Database | PostgreSQL |
 | ORM | Prisma |
-| Auth | JWT + OAuth2 (Kakao, Apple) |
+| Auth | JWT + Email/Password (OAuth2 post-MVP) |
 | Image Storage | AWS S3 + CloudFront |
 | Monorepo | pnpm workspaces + Turborepo |
 

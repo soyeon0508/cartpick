@@ -218,7 +218,8 @@ enum UserStatus {
 
 model User {
   id             Int            @id @default(autoincrement())
-  email          String?        @db.VarChar(255)
+  email          String?        @unique @db.VarChar(255)
+  passwordHash   String?        @map("password_hash") @db.VarChar(255)
   socialProvider SocialProvider? @map("social_provider")
   socialId       String?        @map("social_id") @db.VarChar(255)
   nickname       String         @unique @db.VarChar(30)

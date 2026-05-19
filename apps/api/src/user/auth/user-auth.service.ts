@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export interface UserJwtPayload {
@@ -84,6 +85,116 @@ export class UserAuthService {
     });
 
     return this.issueTokens(existing.user, context);
+  }
+
+  async signup(
+    email: string,
+    password: string,
+    nickname: string,
+    context?: { userAgent?: string; ipAddress?: string },
+  ) {
+    // Check if email already exists
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // Check if nickname already exists
+    const existingNickname = await this.prisma.user.findUnique({
+      where: { nickname },
+    });
+    if (existingNickname) {
+      throw new ConflictException('Nickname already exists');
+    }
+
+    // Hash password
+    const passwordHash = await argon2.hash(password, {
+      type: argon2.argon2id,
+    });
+
+    // Create user
+    const user = await this.prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        passwordHash,
+        nickname,
+      },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        status: true,
+      },
+    });
+
+    // Issue tokens
+    const tokens = await this.issueTokens(user, context);
+
+    return {
+      user,
+      tokens,
+    };
+  }
+
+  async login(
+    email: string,
+    password: string,
+    context?: { userAgent?: string; ipAddress?: string },
+  ) {
+    // Find user by email
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    // Check if user exists and has password
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify password
+    const valid = await argon2.verify(user.passwordHash, password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check user status
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('User is not active');
+    }
+
+    // Issue tokens
+    const tokens = await this.issueTokens(user, context);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        status: user.status,
+      },
+      tokens,
+    };
+  }
+
+  async getMe(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        nickname: true,
+        profileImage: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return user;
   }
 
   async revokeRefreshToken(presented: string): Promise<void> {

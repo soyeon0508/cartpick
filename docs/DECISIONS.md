@@ -6,7 +6,7 @@
 
 | # | 항목 | 결정 |
 |---|------|------|
-| 1 | 카카오 OAuth | 앱 등록 진행, 구현은 Phase 3 |
+| 1 | 유저 로그인 방식 | MVP는 기본 회원가입/로그인(이메일/비밀번호) 우선, 카카오 OAuth는 Post-MVP 또는 Phase 3 이후 재도입 |
 | 2 | 도메인/SSL | MVP는 Railway 기본 도메인, 커스텀 도메인은 배포 직전 |
 | 3 | 관리자 초기 계정 | 환경변수 기반 seed (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) |
 | 4 | 이미지 업로드 | MVP는 관리자만, jpg/png/webp, 최대 5MB |
@@ -39,7 +39,7 @@
 |------|------|-----------|
 | Admin refresh token | M1 범위 축소 | M2 (Auth 모듈 완성 시) |
 | badge_types seed + 뱃지 부여 | M1 범위 축소 | M2 (리뷰 작성 구현 시) |
-| 카카오 OAuth | Phase 3 | M2 |
+| 카카오 OAuth | 기본 회원가입/로그인 우선으로 범위 조정 | Post-MVP |
 | 리뷰 CRUD | Phase 3 | M2 |
 | 홈 API + Resolver | Phase 4 | M3 |
 | 검색 API | Phase 5 | M3 |

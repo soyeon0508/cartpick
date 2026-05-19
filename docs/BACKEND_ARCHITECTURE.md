@@ -8,7 +8,7 @@
 | **API Server** | NestJS | 모듈화 구조, TypeScript 일관성, DI 표준 |
 | **Database** | PostgreSQL | 전문 검색 (pg_trgm), JSONB, 안정성 |
 | **ORM** | Prisma | 타입 안전, 마이그레이션 관리, 가독성 |
-| **Auth** | JWT + OAuth2 (카카오, 애플) | 모바일 소셜 로그인 표준 |
+| **Auth** | JWT + 이메일/비밀번호, OAuth2는 Post-MVP | MVP는 기본 로그인 우선, 소셜 로그인은 이후 확장 |
 | **Admin Web** | Next.js (App Router) | 모노레포 TS 통합, 테이블 친화적 |
 | **Storage** | AWS S3 + CloudFront | 이미지 저장 + CDN |
 | **Deployment** | Railway (MVP) → AWS ECS (Scale) | 초기 운영 부담 최소화 |
@@ -23,12 +23,11 @@ apps/api/src/
 ├── app.module.ts
 │
 ├── modules/
-│   ├── auth/                 # 소셜 로그인, JWT, guards
+│   ├── auth/                 # 이메일/비밀번호 로그인, JWT, guards
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
 │   │   ├── strategies/
-│   │   │   ├── kakao.strategy.ts
-│   │   │   └── apple.strategy.ts
+│   │   │   └── jwt.strategy.ts
 │   │   └── guards/
 │   │       ├── jwt-auth.guard.ts
 │   │       ├── optional-auth.guard.ts
@@ -586,7 +585,7 @@ apps/api/src/modules/
 - [ ] Prisma schema 정의 (전체 테이블)
 - [ ] 초기 migration
 - [ ] Auth skeleton (JwtAuthGuard, OptionalAuthGuard, AdminGuard)
-- [ ] 소셜 로그인 (카카오 먼저)
+- [ ] 유저 기본 회원가입/로그인 (이메일/비밀번호)
 - [ ] 관리자 로그인 (이메일/비번)
 - [ ] Seed 스크립트 구조 (countries, retailers, categories, badge_types)
 

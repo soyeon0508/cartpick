@@ -111,7 +111,7 @@
 | **홈 화면: 마트별 인기 섹션** | "🏪 GS25 인기", "🏪 CU 인기" 섹션 (차별 포인트) | Discovery |
 | **홈 화면: 카테고리 그리드** | "🎯 카테고리" 아이콘 그리드 | Discovery |
 | **상품 카드 상태 뱃지** | NEW / HOT / 첫 리뷰 / SALE / 호불호 통일 표시 | Activation |
-| 회원가입/로그인 | 소셜 로그인 (카카오, 애플) | - |
+| 회원가입/로그인 | MVP는 기본 회원가입/로그인(이메일, 비밀번호), 소셜 로그인(카카오, 애플)은 Post-MVP | - |
 | 상품 검색 | 이름/브랜드 기반 텍스트 검색 | KPI 3 |
 | **리뷰 작성 깔때기 트래킹** | 상품 노출 → 상세 진입 → 리뷰 작성 이벤트 로깅 | KPI 측정 |
 | 관리자: 상품 등록 | 상품/브랜드/카테고리 CRUD | Seed |
@@ -468,10 +468,16 @@ CREATE INDEX idx_categories_country ON categories(country_id, parent_id, display
 ### 인증
 
 ```
+POST   /api/v1/auth/signup         이메일/비밀번호 회원가입
+POST   /api/v1/auth/login          이메일/비밀번호 로그인
+GET    /api/v1/auth/me             현재 유저 조회
+POST   /api/v1/auth/refresh        토큰 갱신
+POST   /api/v1/auth/logout         현재 refresh token 로그아웃
+POST   /api/v1/auth/logout-all     전체 기기 로그아웃
+
+Post-MVP:
 POST   /api/v1/auth/kakao          카카오 소셜 로그인
-POST   /api/v1/auth/apple           애플 소셜 로그인
-POST   /api/v1/auth/refresh         토큰 갱신
-DELETE /api/v1/auth/logout           로그아웃
+POST   /api/v1/auth/apple          애플 소셜 로그인
 ```
 
 ### 국가
@@ -1029,7 +1035,7 @@ GET    /api/admin/v1/logs?admin_id=1&target_type=review
 ### Phase 2: 백엔드 MVP (2~3주)
 
 - [ ] 프로젝트 셋업 (NestJS + PostgreSQL + TypeORM/Prisma)
-- [ ] 인증 모듈 (카카오/애플 소셜 로그인)
+- [ ] 인증 모듈 (기본 회원가입/로그인)
 - [ ] 핵심 CRUD API (국가, 리테일러, 카테고리, 상품, 리뷰)
 - [ ] 검색 API (PostgreSQL full-text search, 한글 형태소)
 - [ ] 관리자 API
@@ -1039,6 +1045,7 @@ GET    /api/admin/v1/logs?admin_id=1&target_type=review
 
 - [ ] Flutter 프로젝트 셋업
 - [ ] 온보딩 / 로그인
+- [ ] 카카오/애플 소셜 로그인은 MVP 이후 재검토
 - [ ] 홈 화면 (리테일러 목록, 큐레이션 섹션)
 - [ ] 리테일러 상세 (카테고리별 상품 리스트)
 - [ ] 상품 상세 (리뷰 통합, 리테일러별 필터)
@@ -1070,7 +1077,7 @@ GET    /api/admin/v1/logs?admin_id=1&target_type=review
 | 백엔드 | NestJS (TypeScript) | 구조화된 프레임워크, TypeScript 통일 |
 | DB | PostgreSQL | 전문 검색, JSON, 안정성 |
 | ORM | Prisma | 타입 안전, 마이그레이션 관리 |
-| 인증 | JWT + OAuth2 (카카오, 애플) | 모바일 소셜 로그인 표준 |
+| 인증 | JWT + 이메일/비밀번호, OAuth2는 Post-MVP | MVP는 기본 로그인 우선, 소셜 로그인은 이후 확장 |
 | 이미지 저장 | AWS S3 + CloudFront | 비용 효율, CDN |
 | 배포 | AWS (EC2/ECS) 또는 Railway/Fly.io | MVP는 Railway 추천 (운영 부담 최소) |
 | 관리자 웹 | Next.js 또는 React + Ant Design | 빠른 어드민 구축 |

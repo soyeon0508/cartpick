@@ -3,8 +3,10 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../strategies/user-jwt.strategy';
 
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
+  (data: keyof AuthenticatedUser | undefined, ctx: ExecutionContext): AuthenticatedUser | any => {
     const req = ctx.switchToHttp().getRequest<Request & { user: AuthenticatedUser }>();
-    return req.user;
+    const user = req.user;
+    
+    return data ? user[data] : user;
   },
 );

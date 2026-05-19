@@ -425,6 +425,7 @@ describe('User Reviews API (create → update → delete)', () => {
     let user2Id: number;
     let user2AccessToken: string;
     let productForBadges: number;
+    let productForUser2FirstBadge: number;
     let retailerForBadges: number;
 
     beforeAll(async () => {
@@ -487,6 +488,10 @@ describe('User Reviews API (create → update → delete)', () => {
       await prisma.review.deleteMany({ where: { userId: user2Id } });
       await prisma.review.deleteMany({ where: { userId, productId: productForBadges } });
       await prisma.retailerProduct.deleteMany({ where: { productId: productForBadges } });
+      if (productForUser2FirstBadge) {
+        await prisma.retailerProduct.deleteMany({ where: { productId: productForUser2FirstBadge } });
+        await prisma.product.deleteMany({ where: { id: productForUser2FirstBadge } });
+      }
       await prisma.product.deleteMany({ where: { id: productForBadges } });
       await prisma.retailer.deleteMany({ where: { id: retailerForBadges } });
       await prisma.user.deleteMany({ where: { id: user2Id } });
@@ -585,6 +590,7 @@ describe('User Reviews API (create → update → delete)', () => {
           status: 'active',
         },
       });
+      productForUser2FirstBadge = product2.id;
 
       // Create retailer-product connection
       await prisma.retailerProduct.create({
@@ -614,10 +620,6 @@ describe('User Reviews API (create → update → delete)', () => {
 
       expect(user2Badges).toHaveLength(1);
 
-      // Clean up
-      await prisma.review.deleteMany({ where: { userId: user2Id, productId: product2.id } });
-      await prisma.retailerProduct.deleteMany({ where: { productId: product2.id } });
-      await prisma.product.delete({ where: { id: product2.id } });
     });
 
     it('does not award badge on review update', async () => {
@@ -652,8 +654,89 @@ describe('User Reviews API (create → update → delete)', () => {
       expect(badgesAfterUpdate).toHaveLength(1);
     });
 
+    it('awards only one first_reviewer badge for concurrent first reviews', async () => {
+      const suffix = Date.now();
+      const [user3, user4, product] = await Promise.all([
+        prisma.user.create({
+          data: {
+            email: `badge-race-3-${suffix}@example.com`,
+            passwordHash: 'hashed-password',
+            nickname: `뱃지동시3${suffix}`,
+            status: 'active',
+          },
+        }),
+        prisma.user.create({
+          data: {
+            email: `badge-race-4-${suffix}@example.com`,
+            passwordHash: 'hashed-password',
+            nickname: `뱃지동시4${suffix}`,
+            status: 'active',
+          },
+        }),
+        prisma.product.create({
+          data: {
+            countryId: testCountryId,
+            brandId,
+            categoryId,
+            name: `동시리뷰상품${suffix}`,
+            normalizedName: `동시리뷰상품${suffix}`,
+            status: 'active',
+          },
+        }),
+      ]);
+
+      await prisma.retailerProduct.create({
+        data: {
+          retailerId: retailerForBadges,
+          productId: product.id,
+        },
+      });
+
+      const jwt = require('jsonwebtoken');
+      const user3AccessToken = jwt.sign(
+        { sub: user3.id, nickname: user3.nickname, role: 'user' },
+        'dev-user-jwt-secret-change-in-production',
+        { expiresIn: '30m' },
+      );
+      const user4AccessToken = jwt.sign(
+        { sub: user4.id, nickname: user4.nickname, role: 'user' },
+        'dev-user-jwt-secret-change-in-production',
+        { expiresIn: '30m' },
+      );
+
+      const [res3, res4] = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/api/v1/products/${product.id}/reviews`)
+          .set('Authorization', `Bearer ${user3AccessToken}`)
+          .send({ rating: 5, body: '첫 번째 동시 리뷰' }),
+        request(app.getHttpServer())
+          .post(`/api/v1/products/${product.id}/reviews`)
+          .set('Authorization', `Bearer ${user4AccessToken}`)
+          .send({ rating: 4, body: '두 번째 동시 리뷰' }),
+      ]);
+
+      expect([res3.status, res4.status].sort()).toEqual([201, 201]);
+
+      const awardedBadges = await prisma.userBadge.findMany({
+        where: {
+          userId: { in: [user3.id, user4.id] },
+          badgeTypeId: firstReviewerBadgeTypeId,
+        },
+      });
+
+      expect(awardedBadges).toHaveLength(1);
+
+      await prisma.userBadge.deleteMany({
+        where: { userId: { in: [user3.id, user4.id] } },
+      });
+      await prisma.review.deleteMany({ where: { productId: product.id } });
+      await prisma.retailerProduct.deleteMany({ where: { productId: product.id } });
+      await prisma.product.delete({ where: { id: product.id } });
+      await prisma.user.deleteMany({ where: { id: { in: [user3.id, user4.id] } } });
+    });
+
     it('does not remove badge when review is deleted', async () => {
-      // Second user has a badge from previous test
+      // Second user has a badge from the first review on productForUser2FirstBadge
       const badgesBeforeDelete = await prisma.userBadge.findMany({
         where: {
           userId: user2Id,
@@ -663,9 +746,9 @@ describe('User Reviews API (create → update → delete)', () => {
 
       expect(badgesBeforeDelete).toHaveLength(1);
 
-      // Delete second user's review
+      // Delete the review that awarded the badge.
       await request(app.getHttpServer())
-        .delete(`/api/v1/products/${productForBadges}/reviews/me`)
+        .delete(`/api/v1/products/${productForUser2FirstBadge}/reviews/me`)
         .set('Authorization', `Bearer ${user2AccessToken}`)
         .expect(204);
 

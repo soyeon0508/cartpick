@@ -4,11 +4,36 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { Prisma } from '@prisma/client';
 
+const REVIEW_CREATE_MAX_RETRIES = 3;
+
 @Injectable()
 export class UserReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: number, productId: number, dto: CreateReviewDto) {
+    for (let attempt = 1; attempt <= REVIEW_CREATE_MAX_RETRIES; attempt++) {
+      try {
+        return await this.createInSerializableTransaction(userId, productId, dto);
+      } catch (error) {
+        if (
+          attempt < REVIEW_CREATE_MAX_RETRIES &&
+          this.isSerializationConflict(error)
+        ) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error('Review creation failed after retry attempts');
+  }
+
+  private async createInSerializableTransaction(
+    userId: number,
+    productId: number,
+    dto: CreateReviewDto,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       // Check if product exists
       const product = await tx.product.findUnique({
@@ -141,6 +166,8 @@ export class UserReviewsService {
         createdAt: completeReview!.createdAt,
         updatedAt: completeReview!.updatedAt,
       };
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
   }
 
@@ -331,5 +358,12 @@ export class UserReviewsService {
         averageRating,
       },
     });
+  }
+
+  private isSerializationConflict(error: unknown) {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2034'
+    );
   }
 }

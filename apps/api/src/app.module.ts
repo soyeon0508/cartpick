@@ -8,6 +8,7 @@ import { PublicProductsModule } from './public/products/public-products.module';
 import { UserAuthModule } from './user/auth/user-auth.module';
 import { UserReviewsModule } from './user/reviews/user-reviews.module';
 import { ReviewLikesModule } from './review-likes/review-likes.module';
+import { ProductBookmarksModule } from './user/bookmarks/product-bookmarks.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ReviewLikesModule } from './review-likes/review-likes.module';
     UserAuthModule,
     UserReviewsModule,
     ReviewLikesModule,
+    ProductBookmarksModule,
   ],
   controllers: [HealthController],
 })

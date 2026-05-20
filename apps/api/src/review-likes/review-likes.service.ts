@@ -28,6 +28,20 @@ export class ReviewLikesService {
       throw new NotFoundException('Review not found for this product');
     }
 
+    // Check if user already liked this review
+    const existingLike = await this.prisma.reviewLike.findUnique({
+      where: {
+        userId_reviewId: {
+          userId,
+          reviewId,
+        },
+      },
+    });
+
+    if (existingLike) {
+      throw new ConflictException('You have already liked this review');
+    }
+
     // Create like and increment likeCount in a transaction
     const like = await this.prisma.$transaction(async (tx) => {
       const newLike = await tx.reviewLike.create({

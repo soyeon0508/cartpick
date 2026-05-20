@@ -11,6 +11,11 @@ describe('ReviewLikes (e2e)', () => {
   let userId: number;
   let productId: number;
   let reviewId: number;
+  let countryId: number;
+  let brandId: number;
+  let categoryId: number;
+
+  const uniqueSuffix = Math.random().toString(36).substring(2, 8);
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -23,42 +28,40 @@ describe('ReviewLikes (e2e)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    // Clean up database (order matters due to foreign key constraints)
-    await prisma.reviewLike.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.userBadge.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.retailer.deleteMany();
-    await prisma.brand.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.country.deleteMany();
-
-    // Create test data
-    const country = await prisma.country.create({
-      data: {
-        code: 'KR',
-        nameKo: '한국',
-        nameEn: 'Korea',
-        currencyCode: 'KRW',
-        languageCode: 'ko-KR',
-      },
+    // Get existing KR country
+    let country = await prisma.country.findUnique({
+      where: { code: 'KR' },
     });
+
+    if (!country) {
+      country = await prisma.country.create({
+        data: {
+          code: 'KR',
+          nameKo: '한국',
+          nameEn: 'South Korea',
+          currencyCode: 'KRW',
+          languageCode: 'ko-KR',
+        },
+      });
+    }
+    countryId = country.id;
 
     const brand = await prisma.brand.create({
       data: {
         name: '빙그레',
-        slug: 'binggrae',
+        slug: `binggrae-${uniqueSuffix}`,
       },
     });
+    brandId = brand.id;
 
     const category = await prisma.category.create({
       data: {
         countryId: country.id,
         name: '음료',
-        slug: 'beverages',
+        slug: `beverages-${uniqueSuffix}`,
       },
     });
+    categoryId = category.id;
 
     const product = await prisma.product.create({
       data: {
@@ -66,7 +69,7 @@ describe('ReviewLikes (e2e)', () => {
         brandId: brand.id,
         categoryId: category.id,
         name: '메로나',
-        normalizedName: 'merona',
+        normalizedName: `merona-${uniqueSuffix}`,
         status: 'active',
       },
     });
@@ -74,10 +77,11 @@ describe('ReviewLikes (e2e)', () => {
 
     const user = await prisma.user.create({
       data: {
-        email: 'test@example.com',
-        nickname: '테스터',
+        email: `test-${uniqueSuffix}@example.com`,
+        nickname: `테스터-${uniqueSuffix}`,
         passwordHash: 'hashedpassword',
         countryId: country.id,
+        status: 'active',
       },
     });
     userId = user.id;
@@ -93,28 +97,24 @@ describe('ReviewLikes (e2e)', () => {
     });
     reviewId = review.id;
 
-    // Login and get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/v1/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'hashedpassword',
-      });
-
-    authToken = loginResponse.body.data.accessToken;
+    // Create access token manually (simple approach for testing)
+    const jwt = require('jsonwebtoken');
+    authToken = jwt.sign(
+      { sub: userId, nickname: `테스터-${uniqueSuffix}`, role: 'user' },
+      'dev-user-jwt-secret-change-in-production',
+      { expiresIn: '30m' },
+    );
   });
 
   afterAll(async () => {
     // Clean up (order matters due to foreign key constraints)
-    await prisma.reviewLike.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.userBadge.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.retailer.deleteMany();
-    await prisma.brand.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.country.deleteMany();
+    await prisma.reviewLike.deleteMany({ where: { userId } });
+    await prisma.review.deleteMany({ where: { userId } });
+    await prisma.product.deleteMany({ where: { id: productId } });
+    await prisma.userBadge.deleteMany({ where: { userId } });
+    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.brand.deleteMany({ where: { id: brandId } });
+    await prisma.category.deleteMany({ where: { id: categoryId } });
 
     await app.close();
   });

@@ -11,6 +11,8 @@ describe('UserProfile (e2e)', () => {
   let prisma: PrismaService;
   let authToken: string;
   let userId: number;
+  let testEmail: string;
+  let testNickname: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -33,20 +35,13 @@ describe('UserProfile (e2e)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    // Clean up database
-    await prisma.user.deleteMany();
-    await prisma.country.deleteMany();
+    // Use seeded country — do not delete global seed data
+    const country = await prisma.country.findUnique({ where: { code: 'KR' } });
+    if (!country) throw new Error('Seed country KR is required');
 
-    // Create test data
-    const country = await prisma.country.create({
-      data: {
-        code: 'KR',
-        nameKo: '한국',
-        nameEn: 'Korea',
-        currencyCode: 'KRW',
-        languageCode: 'ko-KR',
-      },
-    });
+    const suffix = Date.now();
+    testEmail = `profile-test-${suffix}@example.com`;
+    testNickname = `테스터${suffix}`;
 
     const passwordHash = await argon2.hash('testPassword123!', {
       type: argon2.argon2id,
@@ -54,8 +49,8 @@ describe('UserProfile (e2e)', () => {
 
     const user = await prisma.user.create({
       data: {
-        email: 'test@example.com',
-        nickname: '테스터',
+        email: testEmail,
+        nickname: testNickname,
         passwordHash,
         countryId: country.id,
       },
@@ -66,7 +61,7 @@ describe('UserProfile (e2e)', () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({
-        email: 'test@example.com',
+        email: testEmail,
         password: 'testPassword123!',
       });
 
@@ -74,10 +69,8 @@ describe('UserProfile (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Clean up
-    await prisma.user.deleteMany();
-    await prisma.country.deleteMany();
-
+    await prisma.refreshToken.deleteMany({ where: { userId } });
+    await prisma.user.deleteMany({ where: { id: userId } });
     await app.close();
   });
 
@@ -90,8 +83,8 @@ describe('UserProfile (e2e)', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveProperty('id');
-      expect(response.body.data).toHaveProperty('email', 'test@example.com');
-      expect(response.body.data).toHaveProperty('nickname', '테스터');
+      expect(response.body.data).toHaveProperty('email', testEmail);
+      expect(response.body.data).toHaveProperty('nickname', testNickname);
       expect(response.body.data).toHaveProperty('countryId');
       expect(response.body.data).toHaveProperty('status', 'active');
       expect(response.body.data).toHaveProperty('createdAt');
@@ -112,7 +105,7 @@ describe('UserProfile (e2e)', () => {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          nickname: '테스터',
+          nickname: testNickname,
           profileImage: null,
         },
       });
@@ -162,22 +155,19 @@ describe('UserProfile (e2e)', () => {
     });
 
     it('should return 409 when nickname is already taken', async () => {
-      // Create another user
-      const passwordHash = await argon2.hash('otherPassword123!', {
-        type: argon2.argon2id,
-      });
+      const dupSuffix = Date.now();
+      const dupNickname = `중복닉네임${dupSuffix}`;
 
-      // Get the existing country ID
       const existingUser = await prisma.user.findUnique({
         where: { id: userId },
         select: { countryId: true },
       });
 
-      await prisma.user.create({
+      const dupUser = await prisma.user.create({
         data: {
-          email: 'other@example.com',
-          nickname: '중복닉네임',
-          passwordHash,
+          email: `dup-${dupSuffix}@example.com`,
+          nickname: dupNickname,
+          passwordHash: 'hashed',
           countryId: existingUser!.countryId,
         },
       });
@@ -186,10 +176,11 @@ describe('UserProfile (e2e)', () => {
       await request(app.getHttpServer())
         .patch('/api/v1/users/profile')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({
-          nickname: '중복닉네임',
-        })
+        .send({ nickname: dupNickname })
         .expect(409);
+
+      // Clean up the duplicate user
+      await prisma.user.delete({ where: { id: dupUser.id } });
     });
 
     it('should allow updating to same nickname', async () => {
@@ -197,12 +188,12 @@ describe('UserProfile (e2e)', () => {
         .patch('/api/v1/users/profile')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          nickname: '테스터',
+          nickname: testNickname,
         })
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.nickname).toBe('테스터');
+      expect(response.body.data.nickname).toBe(testNickname);
     });
 
     it('should return 400 for invalid nickname (too short)', async () => {

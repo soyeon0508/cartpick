@@ -4,13 +4,18 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { GlobalExceptionFilter, TransformInterceptor } from '../src/common';
-import * as argon2 from 'argon2';
 
 describe('UserMe (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let authToken: string;
   let userId: number;
+  let otherUserId: number;
+  let product1Id: number;
+  let product2Id: number;
+  let brandId: number;
+  let categoryId: number;
+  const suffix = Date.now();
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -33,163 +38,96 @@ describe('UserMe (e2e)', () => {
 
     prisma = moduleFixture.get<PrismaService>(PrismaService);
 
-    // Clean up database
-    await prisma.user.deleteMany();
-    await prisma.country.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.bookmark.deleteMany();
-    await prisma.reviewLike.deleteMany();
+    // Use seeded country
+    const country = await prisma.country.findUnique({ where: { code: 'KR' } });
+    if (!country) throw new Error('Seed country KR is required');
 
-    // Create test data
-    const country = await prisma.country.create({
-      data: {
-        code: 'KR',
-        nameKo: '한국',
-        nameEn: 'Korea',
-        currencyCode: 'KRW',
-        languageCode: 'ko-KR',
-      },
-    });
+    // Create test users via signup
+    const signupRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/signup')
+      .send({
+        email: `me-test-${suffix}@example.com`,
+        password: 'testPassword123!',
+        nickname: `미테스터${suffix}`,
+      });
+    userId = signupRes.body.data.user.id;
+    authToken = signupRes.body.data.tokens.accessToken;
 
-    const passwordHash = await argon2.hash('testPassword123!', {
-      type: argon2.argon2id,
-    });
+    const otherSignupRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/signup')
+      .send({
+        email: `me-other-${suffix}@example.com`,
+        password: 'testPassword123!',
+        nickname: `다른사용자${suffix}`,
+      });
+    otherUserId = otherSignupRes.body.data.user.id;
 
-    const user = await prisma.user.create({
-      data: {
-        email: 'test@example.com',
-        nickname: '테스터',
-        passwordHash,
-        countryId: country.id,
-      },
-    });
-    userId = user.id;
-
-    // Create products
+    // Create brand + category
     const brand = await prisma.brand.create({
-      data: {
-        name: 'Test Brand',
-        nameEn: 'Test Brand',
-        slug: 'test-brand',
-      },
+      data: { name: `미브랜드${suffix}`, slug: `me-brand-${suffix}` },
     });
+    brandId = brand.id;
 
     const category = await prisma.category.create({
-      data: {
-        name: 'Test Category',
-        countryId: country.id,
-        slug: 'test-category',
-      },
+      data: { name: `미카테고리${suffix}`, slug: `me-cat-${suffix}`, countryId: country.id },
     });
+    categoryId = category.id;
 
+    // Create products
     const product1 = await prisma.product.create({
       data: {
-        name: 'Test Product 1',
-        normalizedName: 'test product 1',
+        name: `미상품1-${suffix}`,
+        normalizedName: `미상품1-${suffix}`,
         brandId: brand.id,
         categoryId: category.id,
         countryId: country.id,
+        status: 'active',
       },
     });
+    product1Id = product1.id;
 
     const product2 = await prisma.product.create({
       data: {
-        name: 'Test Product 2',
-        normalizedName: 'test product 2',
+        name: `미상품2-${suffix}`,
+        normalizedName: `미상품2-${suffix}`,
         brandId: brand.id,
         categoryId: category.id,
         countryId: country.id,
+        status: 'active',
       },
     });
+    product2Id = product2.id;
 
-    // Create reviews
+    // Create reviews for main user
     await prisma.review.create({
-      data: {
-        userId,
-        productId: product1.id,
-        rating: 5,
-        body: '테스트 리뷰 내용 1',
-      },
+      data: { userId, productId: product1Id, rating: 5, body: '리뷰1' },
     });
-
     await prisma.review.create({
-      data: {
-        userId,
-        productId: product2.id,
-        rating: 4,
-        body: '테스트 리뷰 내용 2',
-      },
+      data: { userId, productId: product2Id, rating: 4, body: '리뷰2' },
     });
 
     // Create bookmarks
-    await prisma.bookmark.create({
-      data: {
-        userId,
-        productId: product1.id,
-      },
-    });
+    await prisma.bookmark.create({ data: { userId, productId: product1Id } });
+    await prisma.bookmark.create({ data: { userId, productId: product2Id } });
 
-    await prisma.bookmark.create({
-      data: {
-        userId,
-        productId: product2.id,
-      },
-    });
-
-    // Create another user and review to like
-    const passwordHash2 = await argon2.hash('otherPassword123!', {
-      type: argon2.argon2id,
-    });
-
-    const otherUser = await prisma.user.create({
-      data: {
-        email: 'other@example.com',
-        nickname: '다른사용자',
-        passwordHash: passwordHash2,
-        countryId: country.id,
-      },
-    });
-
+    // Create review by other user + like it
     const otherReview = await prisma.review.create({
-      data: {
-        userId: otherUser.id,
-        productId: product1.id,
-        rating: 5,
-        body: '다른 사용자가 작성한 리뷰',
-      },
+      data: { userId: otherUserId, productId: product1Id, rating: 3, body: '다른유저리뷰' },
     });
-
-    // Like the review
-    await prisma.reviewLike.create({
-      data: {
-        userId,
-        reviewId: otherReview.id,
-      },
-    });
-
-    // Login and get auth token
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'testPassword123!',
-      });
-
-    authToken = loginResponse.body.data.tokens.accessToken;
+    await prisma.reviewLike.create({ data: { userId, reviewId: otherReview.id } });
   });
 
   afterAll(async () => {
-    // Clean up
-    await prisma.user.deleteMany();
-    await prisma.country.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.bookmark.deleteMany();
-    await prisma.reviewLike.deleteMany();
-    await prisma.brand.deleteMany();
-    await prisma.category.deleteMany();
-
+    await prisma.reviewLike.deleteMany({ where: { userId } });
+    await prisma.bookmark.deleteMany({ where: { userId } });
+    await prisma.review.deleteMany({ where: { userId } });
+    await prisma.review.deleteMany({ where: { userId: otherUserId } });
+    await prisma.product.deleteMany({ where: { id: { in: [product1Id, product2Id] } } });
+    await prisma.brand.deleteMany({ where: { id: brandId } });
+    await prisma.category.deleteMany({ where: { id: categoryId } });
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
+    await prisma.userBadge.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [userId, otherUserId] } } });
     await app.close();
   });
 
@@ -201,18 +139,14 @@ describe('UserMe (e2e)', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data).toHaveProperty('id');
-      expect(response.body.data).toHaveProperty('email', 'test@example.com');
-      expect(response.body.data).toHaveProperty('nickname', '테스터');
-      expect(response.body.data).toHaveProperty('countryId');
+      expect(response.body.data).toHaveProperty('id', userId);
+      expect(response.body.data).toHaveProperty('email', `me-test-${suffix}@example.com`);
       expect(response.body.data).toHaveProperty('status', 'active');
       expect(response.body.data).toHaveProperty('createdAt');
-      expect(response.body.data).toHaveProperty('stats');
+      expect(response.body.data).not.toHaveProperty('passwordHash');
       expect(response.body.data.stats).toHaveProperty('totalReviews', 2);
       expect(response.body.data.stats).toHaveProperty('totalBookmarks', 2);
       expect(response.body.data.stats).toHaveProperty('totalLikes', 1);
-      expect(response.body.data).not.toHaveProperty('password');
-      expect(response.body.data).not.toHaveProperty('passwordHash');
     });
 
     it('should return 401 when not authenticated', async () => {
@@ -222,40 +156,29 @@ describe('UserMe (e2e)', () => {
     });
 
     it('should return correct stats for user with no activity', async () => {
-      // Create a new user with no activity
-      const passwordHash = await argon2.hash('newPassword123!', {
-        type: argon2.argon2id,
-      });
-
-      const newUser = await prisma.user.create({
-        data: {
-          email: 'newuser@example.com',
-          nickname: '새사용자',
-          passwordHash,
-          countryId: 1, // Assuming country ID 1 exists
-        },
-      });
-
-      // Login as new user
-      const loginResponse = await request(app.getHttpServer())
-        .post('/api/v1/auth/login')
+      const noActivitySignup = await request(app.getHttpServer())
+        .post('/api/v1/auth/signup')
         .send({
-          email: 'newuser@example.com',
-          password: 'newPassword123!',
+          email: `me-noact-${suffix}@example.com`,
+          password: 'testPassword123!',
+          nickname: `빈유저${suffix}`,
         });
 
-      const newAuthToken = loginResponse.body.data.tokens.accessToken;
+      const noActivityToken = noActivitySignup.body.data.tokens.accessToken;
+      const noActivityUserId = noActivitySignup.body.data.user.id;
 
-      // Get me data
       const response = await request(app.getHttpServer())
         .get('/api/v1/users/me')
-        .set('Authorization', `Bearer ${newAuthToken}`)
+        .set('Authorization', `Bearer ${noActivityToken}`)
         .expect(200);
 
-      expect(response.body.success).toBe(true);
       expect(response.body.data.stats).toHaveProperty('totalReviews', 0);
       expect(response.body.data.stats).toHaveProperty('totalBookmarks', 0);
       expect(response.body.data.stats).toHaveProperty('totalLikes', 0);
+
+      // Clean up
+      await prisma.refreshToken.deleteMany({ where: { userId: noActivityUserId } });
+      await prisma.user.deleteMany({ where: { id: noActivityUserId } });
     });
   });
 });

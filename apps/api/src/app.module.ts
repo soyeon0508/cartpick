@@ -4,6 +4,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health.controller';
 import { AdminAuthModule } from './admin/auth/admin-auth.module';
 import { AdminProductsModule } from './admin/products/admin-products.module';
+import { AdminBrandsModule } from './admin/brands/admin-brands.module';
+import { AdminCategoriesModule } from './admin/categories/admin-categories.module';
+import { AdminRetailersModule } from './admin/retailers/admin-retailers.module';
+import { AdminReportsModule } from './admin/reports/admin-reports.module';
+import { AdminDashboardModule } from './admin/dashboard/admin-dashboard.module';
 import { PublicProductsModule } from './public/products/public-products.module';
 import { UserAuthModule } from './user/auth/user-auth.module';
 import { UserReviewsModule } from './user/reviews/user-reviews.module';
@@ -22,6 +27,11 @@ import { UserMeModule } from './user/me/user-me.module';
     PrismaModule,
     AdminAuthModule,
     AdminProductsModule,
+    AdminBrandsModule,
+    AdminCategoriesModule,
+    AdminRetailersModule,
+    AdminReportsModule,
+    AdminDashboardModule,
     PublicProductsModule,
     UserAuthModule,
     UserReviewsModule,

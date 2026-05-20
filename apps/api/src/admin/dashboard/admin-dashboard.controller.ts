@@ -1,19 +1,14 @@
-import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { AdminJwtGuard } from '../auth/guards/admin-jwt.guard';
 import { AdminDashboardService } from './admin-dashboard.service';
 
 @Controller('admin/v1/dashboard')
+@UseGuards(AdminJwtGuard)
 export class AdminDashboardController {
-  constructor(private readonly dashboardService: AdminDashboardService) {}
+  constructor(private readonly dashboard: AdminDashboardService) {}
 
-  @Get('statistics')
-  getStatistics() {
-    return this.dashboardService.getStatistics();
-  }
-
-  @Get('recent-activity')
-  getRecentActivity(@Query('limit') limit?: string) {
-    return this.dashboardService.getRecentActivity(
-      limit ? parseInt(limit) : 10,
-    );
+  @Get()
+  getStats() {
+    return this.dashboard.getStats();
   }
 }

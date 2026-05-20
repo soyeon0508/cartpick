@@ -1,57 +1,48 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  ParseIntPipe,
+  Body, Controller, Delete, Get, HttpCode, HttpStatus,
+  Param, ParseIntPipe, Post, Put, Query, UseGuards,
 } from '@nestjs/common';
+import { AdminJwtGuard } from '../auth/guards/admin-jwt.guard';
 import { AdminCategoriesService } from './admin-categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Controller('admin/v1/categories')
+@UseGuards(AdminJwtGuard)
 export class AdminCategoriesController {
-  constructor(private readonly categoriesService: AdminCategoriesService) {}
-
-  @Post()
-  create(@Body() createCategoryDto: CreateCategoryDto) {
-    return this.categoriesService.create(createCategoryDto);
-  }
+  constructor(private readonly categories: AdminCategoriesService) {}
 
   @Get()
   findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
     @Query('countryId') countryId?: string,
+    @Query('parentId') parentId?: string,
     @Query('isActive') isActive?: string,
   ) {
-    return this.categoriesService.findAll(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 20,
+    return this.categories.findAll(
       countryId ? parseInt(countryId) : undefined,
-      isActive ? isActive === 'true' : undefined,
+      parentId !== undefined ? parseInt(parentId) : undefined,
+      isActive !== undefined ? isActive === 'true' : undefined,
     );
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.findOne(id);
+    return this.categories.findOne(id);
   }
 
-  @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateCategoryDto: UpdateCategoryDto,
-  ) {
-    return this.categoriesService.update(id, updateCategoryDto);
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  create(@Body() dto: CreateCategoryDto) {
+    return this.categories.create(dto);
+  }
+
+  @Put(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
+    return this.categories.update(id, dto);
   }
 
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.remove(id);
+    return this.categories.remove(id);
   }
 }

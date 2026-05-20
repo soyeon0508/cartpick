@@ -1,76 +1,52 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateRetailerDto } from './dto/create-retailer.dto';
 import { UpdateRetailerDto } from './dto/update-retailer.dto';
 
 @Injectable()
 export class AdminRetailersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(createRetailerDto: CreateRetailerDto) {
-    return this.prisma.retailer.create({
-      data: createRetailerDto,
-    });
+  async create(dto: CreateRetailerDto) {
+    const existing = await this.prisma.retailer.findUnique({ where: { slug: dto.slug } });
+    if (existing) throw new ConflictException({ error: 'CONFLICT', message: `Slug '${dto.slug}' is already taken` });
+
+    return this.prisma.retailer.create({ data: dto });
   }
 
-  async findAll(page: number = 1, limit: number = 20, countryId?: string, isActive?: boolean) {
-    const skip = (page - 1) * limit;
-
+  async findAll(countryId?: number, isActive?: boolean) {
     const where: any = {};
-    if (countryId) {
-      where.countryId = countryId;
-    }
-    if (isActive !== undefined) {
-      where.isActive = isActive;
-    }
+    if (countryId) where.countryId = countryId;
+    if (isActive !== undefined) where.isActive = isActive;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.retailer.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-      this.prisma.retailer.count({ where }),
-    ]);
-
-    return {
-      items,
-      totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit),
-    };
+    return this.prisma.retailer.findMany({
+      where,
+      orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+    });
   }
 
   async findOne(id: number) {
-    const retailer = await this.prisma.retailer.findUnique({
-      where: { id },
-    });
-
-    if (!retailer) {
-      throw new NotFoundException(`Retailer with ID ${id} not found`);
-    }
-
+    const retailer = await this.prisma.retailer.findUnique({ where: { id } });
+    if (!retailer) throw new NotFoundException({ error: 'NOT_FOUND', message: `Retailer ${id} not found` });
     return retailer;
   }
 
-  async update(id: number, updateRetailerDto: UpdateRetailerDto) {
+  async update(id: number, dto: UpdateRetailerDto) {
     await this.findOne(id);
 
-    return this.prisma.retailer.update({
-      where: { id },
-      data: updateRetailerDto,
-    });
+    if (dto.slug) {
+      const existing = await this.prisma.retailer.findUnique({ where: { slug: dto.slug } });
+      if (existing && existing.id !== id) {
+        throw new ConflictException({ error: 'CONFLICT', message: `Slug '${dto.slug}' is already taken` });
+      }
+    }
+
+    return this.prisma.retailer.update({ where: { id }, data: dto });
   }
 
   async remove(id: number) {
     await this.findOne(id);
-
-    return this.prisma.retailer.delete({
-      where: { id },
-    });
+    await this.prisma.retailer.delete({ where: { id } });
+    return { id };
   }
 }

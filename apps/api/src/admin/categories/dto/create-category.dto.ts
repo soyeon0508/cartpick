@@ -1,34 +1,34 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsNotEmpty } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsInt, IsOptional, IsString, Length, MaxLength, Min } from 'class-validator';
 
 export class CreateCategoryDto {
-  @ApiProperty({ description: 'Country ID' })
   @IsInt()
-  @IsNotEmpty()
-  countryId: number;
+  @Min(1)
+  countryId!: number;
 
-  @ApiProperty({ description: 'Category name' })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiPropertyOptional({ description: 'Parent category ID' })
-  @IsInt()
   @IsOptional()
+  @IsInt()
+  @Min(1)
   parentId?: number;
 
-  @ApiPropertyOptional({ description: 'Display order' })
-  @IsInt()
+  @IsString()
+  @Length(1, 50)
+  name!: string;
+
+  @IsString()
+  @Length(1, 50)
+  slug!: string;
+
   @IsOptional()
+  @IsInt()
+  @Min(0)
   displayOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Icon URL' })
-  @IsString()
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
   iconUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Whether the category is active', default: true })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

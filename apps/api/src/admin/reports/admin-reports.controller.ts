@@ -1,49 +1,42 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Query,
-  ParseIntPipe,
+  Body, Controller, Get, HttpCode, HttpStatus,
+  Param, ParseIntPipe, Patch, Query, UseGuards,
 } from '@nestjs/common';
+import { AdminJwtGuard } from '../auth/guards/admin-jwt.guard';
+import { CurrentAdmin } from '../auth/decorators/current-admin.decorator';
 import { AdminReportsService } from './admin-reports.service';
 import { UpdateReportDto } from './dto/update-report.dto';
 
 @Controller('admin/v1/reports')
+@UseGuards(AdminJwtGuard)
 export class AdminReportsController {
-  constructor(private readonly reportsService: AdminReportsService) {}
+  constructor(private readonly reports: AdminReportsService) {}
 
   @Get()
   findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
     @Query('status') status?: string,
-    @Query('reviewId') reviewId?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
-    return this.reportsService.findAll(
-      page ? parseInt(page) : 1,
+    return this.reports.findAll(
+      status,
       limit ? parseInt(limit) : 20,
-      status as any,
-      reviewId ? parseInt(reviewId) : undefined,
+      offset ? parseInt(offset) : 0,
     );
-  }
-
-  @Get('statistics')
-  getStatistics() {
-    return this.reportsService.getStatistics();
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.reportsService.findOne(id);
+    return this.reports.findOne(id);
   }
 
   @Patch(':id')
+  @HttpCode(HttpStatus.OK)
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateReportDto: UpdateReportDto,
+    @Body() dto: UpdateReportDto,
+    @CurrentAdmin() admin: { id: number },
   ) {
-    return this.reportsService.update(id, updateReportDto);
+    return this.reports.update(id, dto, admin.id);
   }
 }

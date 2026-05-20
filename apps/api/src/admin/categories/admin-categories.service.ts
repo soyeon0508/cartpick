@@ -1,103 +1,75 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class AdminCategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(createCategoryDto: CreateCategoryDto) {
-    // Generate slug from name
-    const slug = createCategoryDto.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  async create(dto: CreateCategoryDto) {
+    const existing = await this.prisma.category.findUnique({ where: { slug: dto.slug } });
+    if (existing) throw new ConflictException({ error: 'CONFLICT', message: `Slug '${dto.slug}' is already taken` });
 
-    return this.prisma.category.create({
-      data: {
-        ...createCategoryDto,
-        slug,
-      },
-    });
+    const depth = dto.parentId ? 1 : 0;
+
+    return this.prisma.category.create({ data: { ...dto, depth } });
   }
 
-  async findAll(page: number = 1, limit: number = 20, countryId?: number, isActive?: boolean) {
-    const skip = (page - 1) * limit;
-
+  async findAll(countryId?: number, parentId?: number, isActive?: boolean) {
     const where: any = {};
-    if (countryId) {
-      where.countryId = countryId;
-    }
-    if (isActive !== undefined) {
-      where.isActive = isActive;
-    }
+    if (countryId) where.countryId = countryId;
+    if (parentId !== undefined) where.parentId = parentId;
+    if (isActive !== undefined) where.isActive = isActive;
 
-    const [items, totalCount] = await Promise.all([
-      this.prisma.category.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: [
-          { countryId: 'asc' },
-          { displayOrder: 'asc' },
-          { name: 'asc' },
-        ],
-        include: {
-          parent: true,
-          children: true,
-        },
-      }),
-      this.prisma.category.count({ where }),
-    ]);
-
-    return {
-      items,
-      totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit),
-    };
+    return this.prisma.category.findMany({
+      where,
+      orderBy: [{ countryId: 'asc' }, { displayOrder: 'asc' }, { name: 'asc' }],
+      include: { parent: { select: { id: true, name: true } } },
+    });
   }
 
   async findOne(id: number) {
     const category = await this.prisma.category.findUnique({
       where: { id },
-      include: {
-        parent: true,
-        children: true,
-      },
+      include: { parent: { select: { id: true, name: true } }, children: { select: { id: true, name: true } } },
     });
-
-    if (!category) {
-      throw new NotFoundException(`Category with ID ${id} not found`);
-    }
-
+    if (!category) throw new NotFoundException({ error: 'NOT_FOUND', message: `Category ${id} not found` });
     return category;
   }
 
-  async update(id: number, updateCategoryDto: UpdateCategoryDto) {
+  async update(id: number, dto: UpdateCategoryDto) {
     await this.findOne(id);
 
-    const updateData: any = { ...updateCategoryDto };
-    if (updateCategoryDto.name) {
-      updateData.slug = updateCategoryDto.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
+    if (dto.slug) {
+      const existing = await this.prisma.category.findUnique({ where: { slug: dto.slug } });
+      if (existing && existing.id !== id) {
+        throw new ConflictException({ error: 'CONFLICT', message: `Slug '${dto.slug}' is already taken` });
+      }
     }
 
-    return this.prisma.category.update({
-      where: { id },
-      data: updateData,
-    });
+    const updateData: any = { ...dto };
+    if (dto.parentId !== undefined) {
+      updateData.depth = dto.parentId ? 1 : 0;
+    }
+
+    return this.prisma.category.update({ where: { id }, data: updateData });
   }
 
   async remove(id: number) {
     await this.findOne(id);
 
-    return this.prisma.category.delete({
-      where: { id },
-    });
+    const productCount = await this.prisma.product.count({ where: { categoryId: id } });
+    if (productCount > 0) {
+      throw new ConflictException({ error: 'CONFLICT', message: `Cannot delete category with ${productCount} associated products` });
+    }
+
+    const childCount = await this.prisma.category.count({ where: { parentId: id } });
+    if (childCount > 0) {
+      throw new ConflictException({ error: 'CONFLICT', message: `Cannot delete category that has ${childCount} child categories` });
+    }
+
+    await this.prisma.category.delete({ where: { id } });
+    return { id };
   }
 }

@@ -1,37 +1,40 @@
-import { IsString, IsOptional, IsBoolean, IsInt, IsNotEmpty, IsUrl, IsEnum } from 'class-validator';
-
-export enum RetailerType {
-  ONLINE = 'ONLINE',
-  OFFLINE = 'OFFLINE',
-  BOTH = 'BOTH',
-}
+import { LaunchStatus, RetailerType } from '@prisma/client';
+import { IsBoolean, IsEnum, IsOptional, IsString, Length, MaxLength, Min, IsInt } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateRetailerDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  countryId!: number;
 
   @IsString()
-  @IsNotEmpty()
-  countryId: string;
+  @Length(1, 50)
+  name!: string;
 
   @IsString()
-  @IsOptional()
-  nameEn?: string;
-
-  @IsUrl()
-  @IsOptional()
-  websiteUrl?: string;
-
-  @IsUrl()
-  @IsOptional()
-  logoUrl?: string;
+  @Length(1, 50)
+  slug!: string;
 
   @IsEnum(RetailerType)
-  @IsOptional()
-  type?: RetailerType;
+  retailerType!: RetailerType;
 
-  @IsBoolean()
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsEnum(LaunchStatus)
+  launchStatus?: LaunchStatus;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  displayOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { AdminRetailersService } from './admin-retailers.service';
+import { AdminAuthModule } from '../auth/admin-auth.module';
 import { AdminRetailersController } from './admin-retailers.controller';
-import { PrismaModule } from '../../prisma/prisma.module';
+import { AdminRetailersService } from './admin-retailers.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [AdminAuthModule],
   controllers: [AdminRetailersController],
   providers: [AdminRetailersService],
-  exports: [AdminRetailersService],
 })
 export class AdminRetailersModule {}

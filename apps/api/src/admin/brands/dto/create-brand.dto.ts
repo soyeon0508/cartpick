@@ -1,24 +1,25 @@
-import { IsString, IsOptional, IsBoolean, IsNotEmpty } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString, Length, MaxLength } from 'class-validator';
 
 export class CreateBrandDto {
-  @ApiProperty({ description: 'Brand name' })
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @Length(1, 100)
+  name!: string;
 
-  @ApiPropertyOptional({ description: 'Brand name in English' })
-  @IsString()
   @IsOptional()
+  @IsString()
+  @Length(1, 100)
   nameEn?: string;
 
-  @ApiPropertyOptional({ description: 'Brand logo URL' })
   @IsString()
+  @Length(1, 100)
+  slug!: string;
+
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
   logoUrl?: string;
 
-  @ApiPropertyOptional({ description: 'Whether the brand is active', default: true })
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }

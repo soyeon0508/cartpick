@@ -1,17 +1,11 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum } from 'class-validator';
 
-export enum ReportStatus {
-  PENDING = 'pending',
-  RESOLVED = 'resolved',
-  DISMISSED = 'dismissed',
+export enum ReportAction {
+  RESOLVE = 'resolve',
+  DISMISS = 'dismiss',
 }
 
 export class UpdateReportDto {
-  @IsEnum(ReportStatus)
-  @IsOptional()
-  status?: ReportStatus;
-
-  @IsString()
-  @IsOptional()
-  adminNote?: string;
+  @IsEnum(ReportAction)
+  action!: ReportAction;
 }

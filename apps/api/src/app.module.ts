@@ -9,6 +9,7 @@ import { AdminCategoriesModule } from './admin/categories/admin-categories.modul
 import { AdminRetailersModule } from './admin/retailers/admin-retailers.module';
 import { AdminReportsModule } from './admin/reports/admin-reports.module';
 import { AdminDashboardModule } from './admin/dashboard/admin-dashboard.module';
+import { AdminRetailerProductsModule } from './admin/retailer-products/admin-retailer-products.module';
 import { PublicProductsModule } from './public/products/public-products.module';
 import { UserAuthModule } from './user/auth/user-auth.module';
 import { UserReviewsModule } from './user/reviews/user-reviews.module';
@@ -32,6 +33,7 @@ import { UserMeModule } from './user/me/user-me.module';
     AdminRetailersModule,
     AdminReportsModule,
     AdminDashboardModule,
+    AdminRetailerProductsModule,
     PublicProductsModule,
     UserAuthModule,
     UserReviewsModule,

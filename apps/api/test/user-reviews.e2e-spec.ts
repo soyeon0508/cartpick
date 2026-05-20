@@ -4,10 +4,12 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { GlobalExceptionFilter, TransformInterceptor } from '../src/common';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ReviewRateLimitGuard } from '../src/common/guards/review-rate-limit.guard';
 
 describe('User Reviews API (create → update → delete)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let rateLimitGuard: ReviewRateLimitGuard;
   let userId: number;
   let productId: number;
   let retailerId: number;
@@ -44,6 +46,7 @@ describe('User Reviews API (create → update → delete)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
+    rateLimitGuard = app.get(ReviewRateLimitGuard);
 
     // Create test user
     const user = await prisma.user.create({
@@ -138,16 +141,23 @@ describe('User Reviews API (create → update → delete)', () => {
   });
 
   afterAll(async () => {
-    // Clean up in order
+    // Clean up in order (badges and likes must be deleted before user/review)
     await prisma.userBadge.deleteMany({ where: { userId } });
+    await prisma.reviewLike.deleteMany({ where: { userId } });
+    await prisma.bookmark.deleteMany({ where: { userId } });
     await prisma.review.deleteMany({ where: { userId } });
     await prisma.retailerProduct.deleteMany({ where: { productId } });
     await prisma.product.deleteMany({ where: { id: productId } });
     await prisma.retailer.deleteMany({ where: { id: retailerId } });
     await prisma.category.deleteMany({ where: { id: categoryId } });
     await prisma.brand.deleteMany({ where: { id: brandId } });
+    await prisma.refreshToken.deleteMany({ where: { userId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await app.close();
+  });
+
+  beforeEach(() => {
+    rateLimitGuard.clearAll();
   });
 
   describe('POST /api/v1/products/:productId/reviews', () => {

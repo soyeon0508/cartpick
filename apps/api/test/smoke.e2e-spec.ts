@@ -58,10 +58,10 @@ describe('M1 smoke flow (admin login → create → public get)', () => {
       .expect(201);
 
     expect(res.body.success).toBe(true);
-    expect(res.body.data.accessToken).toBeDefined();
+    expect(res.body.data.tokens.accessToken).toBeDefined();
     expect(res.body.data.admin.email).toBe(email);
 
-    accessToken = res.body.data.accessToken;
+    accessToken = res.body.data.tokens.accessToken;
   });
 
   it('POST /api/admin/v1/auth/login with wrong password returns 401', async () => {

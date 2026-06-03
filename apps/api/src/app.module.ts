@@ -11,6 +11,7 @@ import { AdminReportsModule } from './admin/reports/admin-reports.module';
 import { AdminDashboardModule } from './admin/dashboard/admin-dashboard.module';
 import { AdminRetailerProductsModule } from './admin/retailer-products/admin-retailer-products.module';
 import { PublicProductsModule } from './public/products/public-products.module';
+import { PublicHomeModule } from './public/home/home.module';
 import { UserAuthModule } from './user/auth/user-auth.module';
 import { UserReviewsModule } from './user/reviews/user-reviews.module';
 import { ReviewLikesModule } from './review-likes/review-likes.module';
@@ -35,6 +36,7 @@ import { UserMeModule } from './user/me/user-me.module';
     AdminDashboardModule,
     AdminRetailerProductsModule,
     PublicProductsModule,
+    PublicHomeModule,
     UserAuthModule,
     UserReviewsModule,
     ReviewLikesModule,

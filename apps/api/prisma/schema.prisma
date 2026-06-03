@@ -148,12 +148,13 @@ model Product {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  country          Country           @relation(fields: [countryId], references: [id])
-  brand            Brand?            @relation(fields: [brandId], references: [id])
-  category         Category          @relation(fields: [categoryId], references: [id])
-  retailerProducts RetailerProduct[]
-  reviews          Review[]
-  bookmarks        Bookmark[]
+  country           Country           @relation(fields: [countryId], references: [id])
+  brand             Brand?            @relation(fields: [brandId], references: [id])
+  category          Category          @relation(fields: [categoryId], references: [id])
+  retailerProducts  RetailerProduct[]
+  reviews           Review[]
+  bookmarks         Bookmark[]
+  homeSectionItems  HomeSectionItem[]
 
   @@index([categoryId, countryId, status], map: "idx_products_category")
   @@index([brandId, countryId], map: "idx_products_brand")
@@ -491,6 +492,7 @@ model HomeSectionItem {
   createdAt     DateTime @default(now()) @map("created_at")
 
   homeSection HomeSection @relation(fields: [homeSectionId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id])
 
   @@map("home_section_items")
 }

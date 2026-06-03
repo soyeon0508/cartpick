@@ -1,14 +1,16 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { clearTokens } from '@/lib/auth'
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-  { name: 'Products', href: '/dashboard/products', icon: '📦' },
-  { name: 'Reviews', href: '/dashboard/reviews', icon: '⭐' },
-  { name: 'Brands', href: '/dashboard/brands', icon: '🏷️' },
-  { name: 'Categories', href: '/dashboard/categories', icon: '📁' },
-  { name: 'Retailers', href: '/dashboard/retailers', icon: '🏪' },
+  { name: '대시보드', href: '/', icon: '📊' },
+  { name: '상품', href: '/products', icon: '📦' },
+  { name: '브랜드', href: '/brands', icon: '🏷️' },
+  { name: '카테고리', href: '/categories', icon: '📁' },
+  { name: '리테일러', href: '/retailers', icon: '🏪' },
+  { name: '신고 관리', href: '/reports', icon: '🚨' },
 ]
 
 export default function Sidebar() {
@@ -16,43 +18,45 @@ export default function Sidebar() {
   const router = useRouter()
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token')
+    clearTokens()
     router.push('/login')
   }
 
   return (
-    <div className="w-64 bg-gray-900 min-h-screen flex flex-col">
-      <div className="p-6">
-        <h1 className="text-white text-xl font-bold">CartPick Admin</h1>
+    <div className="w-56 bg-gray-900 min-h-screen flex flex-col shrink-0">
+      <div className="p-5 border-b border-gray-800">
+        <h1 className="text-white text-lg font-bold">CartPick Admin</h1>
       </div>
-      
-      <nav className="flex-1 px-3 space-y-1">
+
+      <nav className="flex-1 px-3 py-4 space-y-1">
         {navigation.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = item.href === '/'
+            ? pathname === '/'
+            : pathname.startsWith(item.href)
           return (
-            <a
+            <Link
               key={item.name}
               href={item.href}
               className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  ? 'bg-gray-700 text-white'
+                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
               }`}
             >
-              <span className="mr-3">{item.icon}</span>
+              <span className="mr-2 text-base">{item.icon}</span>
               {item.name}
-            </a>
+            </Link>
           )
         })}
       </nav>
-      
+
       <div className="p-3 border-t border-gray-800">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+          className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
         >
-          <span className="mr-3">🚪</span>
-          Logout
+          <span className="mr-2">🚪</span>
+          로그아웃
         </button>
       </div>
     </div>

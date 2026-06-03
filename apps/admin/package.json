@@ -4,7 +4,7 @@
   "private": true,
   "description": "CartPick Admin Web",
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3080",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@cartpick/shared": "workspace:*",
     "@cartpick/types": "workspace:*",
+    "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-query": "^5.0.0",
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.0",
